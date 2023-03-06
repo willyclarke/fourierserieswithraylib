@@ -28,7 +28,7 @@ Or if Ninja build is preferred:
 cmake -B build -G Ninja
 ```
 
-### Web
+### Web - untested
 
 Compiling for the web requires the [Emscripten SDK](https://emscripten.org/docs/getting_started/downloads.html):
 
