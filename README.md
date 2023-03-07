@@ -26,6 +26,7 @@ Or if Ninja build is preferred:
 
 ```bash
 cmake -B build -G Ninja
+cmake --build build
 ```
 
 ### Web - untested
