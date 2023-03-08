@@ -281,6 +281,12 @@ void UpdateDrawFrame(data *pData) {
           Conv2Pix(C0PosX + AccX, C0PosY + AccY, pData->m2Pixel);
       DrawCircleLines(FourierTerm.X, FourierTerm.Y, Radius * pData->m2Pixel,
                       Fade(BLUE, 0.3f));
+
+      auto const CurrCircleLine =
+          Conv2Pix(C0PosX + AccX + Radius * std::sin(E.Theta),
+                   C0PosY + AccY + Radius * std::cos(E.Theta), pData->m2Pixel);
+      DrawLine(CurrCircleLine.X, CurrCircleLine.Y, FourierTerm.X, FourierTerm.Y,
+               Fade(BLACK, 1.0f));
     }
   }
 
