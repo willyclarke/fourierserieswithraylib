@@ -52,28 +52,30 @@ pixel_pos Conv2Pix(float X, float Y, //!<
 
 //------------------------------------------------------------------------------
 struct square_wave_elem {
-  double Amplitude{};
-  double Yn{};
-  double Xn{};
-  double Theta{};
+  float Amplitude{};
+  float Yn{};
+  float Xn{};
+  float Theta{};
 };
 
 //------------------------------------------------------------------------------
 struct data {
-  int screenWidth = 1024;
+  int screenWidth = 1280;
   int screenHeight = 768;
   int Key{};
   int KeyPrv{};
-  double X{};
-  double Y{};
-  double XAcc{};
-  double Fx{};         //!< Fourier calculated series value.
-  int n{1};            //!< Fourier series number of terms.
-  double m2Pixel{100}; //!< Meter 2 pixel conversion - multiplicator.
-  double dt{};
-  double t{};
+  bool StopUpdate{};
+  float X{};
+  float Y{};
+  float Time{};
+  float Fx{};         //!< Fourier calculated series value.
+  int n{1};           //!< Fourier series number of terms.
+  float m2Pixel{100}; //!< Meter 2 pixel conversion - multiplicator.
+  float dt{};
+  float t{};
   std::vector<pixel_pos> vPixelPos{};
   std::vector<square_wave_elem> vSquareWaveElems{};
+  std::vector<pixel_pos> vGridLines{};
 };
 
 //----------------------------------------------------------------------------------
@@ -88,9 +90,9 @@ void UpdateDrawFrame(data *Data); // Update and Draw one frame
 // @ wave.
 // @ input term - the n'th term of the series.
 // @ return - the amplitude of the term.
-double FuncFourierSquareWaveAmplitude(int nthterm) {
-  constexpr double FourOverPI = 4.0 / M_PI;
-  return FourOverPI / (2.0 * double(nthterm) - 1.0);
+float FuncFourierSquareWaveAmplitude(int nthterm) {
+  constexpr float FourOverPI = 4.0 / M_PI;
+  return FourOverPI / (2.0 * float(nthterm) - 1.0);
 }
 
 //------------------------------------------------------------------------------
@@ -98,10 +100,10 @@ double FuncFourierSquareWaveAmplitude(int nthterm) {
 // @NOTE: This function has side effect - it will update each element with the
 //        current Theta angle and the value of each term.
 // @return - Sum of n elements of the Fourier square wave.
-double FuncFourierSquareWave(std::vector<square_wave_elem> &vSquareWaveElems,
-                             double Omegat) {
-  double Sum{};
-  double n{1};
+float FuncFourierSquareWave(std::vector<square_wave_elem> &vSquareWaveElems,
+                            float Omegat) {
+  float Sum{};
+  float n{1};
   for (auto &E : vSquareWaveElems) {
     auto const Angle{(2.0 * n - 1.0) * Omegat};
     E.Yn = E.Amplitude * std::sin((Angle));
@@ -115,20 +117,20 @@ double FuncFourierSquareWave(std::vector<square_wave_elem> &vSquareWaveElems,
 
 //------------------------------------------------------------------------------
 // @ desc Compute square wave based on n terms fourier series.
-// @ input double t - time
+// @ input float t - time
 // @ input n - number of terms
 // @ output f(t) - at time t
 // @ link :
 // https://www.math.kit.edu/iana3/lehre/fourierana2014w/media/fstable141127.pdf
 // @ function number 6
-double FuncFourierSquareWave(double Theta, int N) {
-  double Sum{};
+float FuncFourierSquareWave(float Theta, int N) {
+  float Sum{};
   for (int n = 0; n < N; ++n) {
-    Sum += std::sin((2.0 * double(n) - 1.0) * Theta) / (2.0 * double(n) - 1.0);
+    Sum += std::sin((2.0 * float(n) - 1.0) * Theta) / (2.0 * float(n) - 1.0);
   }
 
-  constexpr double FourOverPI = 4.0 / M_PI;
-  double const Result = FourOverPI * Sum;
+  constexpr float FourOverPI = 4.0 / M_PI;
+  float const Result = FourOverPI * Sum;
 
   return Result;
 }
@@ -144,13 +146,96 @@ void InitFourierSquareWave(data &Data, int n) {
 
   for (int Idx = 1; Idx <= Data.n; ++Idx) {
     square_wave_elem Element{};
-    Element.Amplitude = 4.0 / M_PI / (2.0 * double(Idx) - 1);
+    Element.Amplitude = 4.0 / M_PI / (2.0 * float(Idx) - 1);
     Element.Yn = 0.0;
     Element.Theta = 0.0;
     Data.vSquareWaveElems.push_back(Element);
   }
 }
 
+/*
+ * Create lines and ticks for a grid in engineering units.
+ */
+auto vGridInPixels(float m2Pixel,               //!<
+                   float GridXLowerLeft = -2.f, //!<
+                   float GridYLowerLeft = -3.f, //!<
+                   float GridLength = 6.f,      //!<
+                   float GridHeigth = 6.f,      //!<
+                   float TickDistance = 0.1f    //!<
+                   ) -> std::vector<pixel_pos> {
+
+  std::vector<pixel_pos> Result{};
+
+  // ---
+  // NOTE: Make and draw a grid.
+  // ---
+  struct grid_point {
+    float fromX{};
+    float fromY{};
+    float toX{};
+    float toY{};
+  };
+
+  const float NumTicks = GridLength / TickDistance;
+  std::vector<grid_point> vGridPoint{};
+
+  //!< Vertical left
+  vGridPoint.push_back(grid_point{GridXLowerLeft, GridYLowerLeft,
+                                  GridXLowerLeft, GridYLowerLeft + GridHeigth});
+
+  //!< Horizontal lower
+  vGridPoint.push_back(grid_point{GridXLowerLeft, GridYLowerLeft,
+                                  GridXLowerLeft + GridLength, GridYLowerLeft});
+
+  //!< Vertical rigth
+  vGridPoint.push_back(grid_point{GridXLowerLeft + GridLength, GridYLowerLeft,
+                                  GridXLowerLeft + GridLength,
+                                  GridYLowerLeft + GridHeigth});
+
+  //!< Horizontal upper
+  vGridPoint.push_back(grid_point{GridXLowerLeft, GridYLowerLeft + GridHeigth,
+                                  GridXLowerLeft + GridLength,
+                                  GridYLowerLeft + GridHeigth});
+
+  //!< Center Horizontal
+  vGridPoint.push_back(grid_point{
+      GridXLowerLeft, GridYLowerLeft + (GridHeigth / 2.f),
+      GridXLowerLeft + GridLength, GridYLowerLeft + (GridHeigth / 2.f)});
+
+  //!< Center Vertical
+  vGridPoint.push_back(grid_point{
+      GridXLowerLeft + GridLength / 2.f, GridYLowerLeft,
+      GridXLowerLeft + GridLength / 2.f, GridYLowerLeft + GridHeigth});
+
+  // ---
+  // NOTE: Create ticks along the horizontal axis.
+  // ---
+  for (size_t Idx = 0; Idx < int(NumTicks); ++Idx) {
+    float const PosX0 = GridXLowerLeft + float(Idx) * TickDistance;
+    float const PosX1 = PosX0;
+    float const PosY0 = GridYLowerLeft + GridHeigth / 2.f;
+    float const PosY1 = PosY0 + TickDistance / 2.f;
+    vGridPoint.push_back(grid_point{PosX0, PosY0, PosX1, PosY1});
+  }
+
+  // ---
+  // NOTE: Create ticks along the vertical axis.
+  // ---
+  for (size_t Idx = 0; Idx < int(NumTicks); ++Idx) {
+    float const PosX0 = GridXLowerLeft + GridLength / 2.f;
+    float const PosX1 = PosX0 + TickDistance / 2.f;
+    float const PosY0 = GridYLowerLeft + float(Idx) * TickDistance;
+    float const PosY1 = PosY0;
+    vGridPoint.push_back(grid_point{PosX0, PosY0, PosX1, PosY1});
+  }
+
+  for (auto Elem : vGridPoint) {
+    Result.push_back(Conv2Pix(Elem.toX, Elem.toY, m2Pixel));
+    Result.push_back(Conv2Pix(Elem.fromX, Elem.fromY, m2Pixel));
+  }
+
+  return Result;
+};
 //----------------------------------------------------------------------------------
 // Main Enry Point
 //----------------------------------------------------------------------------------
@@ -166,8 +251,10 @@ int main() {
 #if defined(PLATFORM_WEB)
   emscripten_set_main_loop(UpdateDrawFrame, 0, 1);
 #else
-  SetTargetFPS(60); // Set our game to run at 60 frames-per-second
+  SetTargetFPS(120); // Set our game to run at 60 frames-per-second
   //--------------------------------------------------------------------------------------
+
+  Data.vGridLines = vGridInPixels(Data.m2Pixel);
 
   int constexpr NumTerms = 5;
   InitFourierSquareWave(Data, NumTerms);
@@ -177,7 +264,8 @@ int main() {
   {
     DrawFPS(10, 10);
     Data.dt = 1. / 60.f; // / GetFPS();
-    Data.t = GetTime();
+    if (!Data.StopUpdate)
+      Data.t = GetTime();
     Data.Key = GetKeyPressed();
 
     UpdateDrawFrame(pData);
@@ -211,8 +299,10 @@ void UpdateDrawFrame(data *pData) {
       std::string("Use arrow keys. Zoom: " + std::to_string(pData->m2Pixel))
           .c_str(),
       140, 10, 20, BLUE);
-  DrawText(std::string("Num terms: " + std::to_string(pData->n)).c_str(), 140,
-           40, 20, BLUE);
+  DrawText(std::string("Num terms: " + std::to_string(pData->n) +
+                       ". Key:" + std::to_string(pData->KeyPrv))
+               .c_str(),
+           140, 40, 20, BLUE);
 
   bool InputChanged{};
 
@@ -231,6 +321,10 @@ void UpdateDrawFrame(data *pData) {
   if (KEY_RIGHT == pData->Key) {
     ++pData->n;
     InputChanged = true;
+  }
+  if (KEY_SPACE == pData->Key) {
+    InputChanged = true;
+    pData->StopUpdate = !pData->StopUpdate;
   }
 
   if (pData->Key)
@@ -259,8 +353,8 @@ void UpdateDrawFrame(data *pData) {
   // NOTE: Accumulate the X and Y terms in order to display a circle for each
   // term.
   // ---
-  double AccX{};
-  double AccY{};
+  float AccX{};
+  float AccY{};
 
   // ---
   // NOTE: Draw a circle for each term in the Fourier series.
@@ -294,15 +388,16 @@ void UpdateDrawFrame(data *pData) {
   // NOTE: Draw the connection line from the circle to the end of the plot.
   // ---
   auto const IndLinePos1 = Conv2Pix(AccX, AccY, pData->m2Pixel);
-  auto const IndLinePos2 = Conv2Pix(C0PosX + C0Radius * 1.2f + pData->XAcc,
-                                    pData->Fx, pData->m2Pixel);
+  auto const IndLinePos2 =
+      Conv2Pix(C0PosX + C0Radius * 1.2f + pData->Time, AccY, pData->m2Pixel);
 
-  pData->XAcc += 1.0 / pData->m2Pixel;
+  pData->Time += 1.0 / pData->m2Pixel;
 
   if (InputChanged ||
-      (pData->XAcc > (GetScreenWidth() - IndLinePos1.X) / pData->m2Pixel)) {
-    pData->XAcc = 0.0;
+      (pData->Time > (GetScreenWidth() - IndLinePos1.X) / pData->m2Pixel)) {
+    pData->Time = 0.0;
     pData->vPixelPos.clear();
+    pData->vGridLines = vGridInPixels(pData->m2Pixel);
     InitFourierSquareWave(*pData, pData->n);
     return;
   }
@@ -319,6 +414,12 @@ void UpdateDrawFrame(data *pData) {
   pData->vPixelPos.push_back(IndLinePos2);
   for (auto const &CurvePoint : pData->vPixelPos) {
     DrawPixel(CurvePoint.X, CurvePoint.Y, RED);
+  }
+
+  for (size_t Idx = 0; Idx < pData->vGridLines.size(); Idx += 2) {
+    auto const &Elem0 = pData->vGridLines[Idx];
+    auto const &Elem1 = pData->vGridLines[Idx + 1];
+    DrawLine(Elem0.X, Elem0.Y, Elem1.X, Elem1.Y, Fade(VIOLET, 1.0f));
   }
 
   EndDrawing();
