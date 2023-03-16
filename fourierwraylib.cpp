@@ -18,6 +18,7 @@
 #include "raylib.h"
 
 #include <cmath>
+#include <iostream>
 #include <string>
 #include <vector>
 
@@ -39,14 +40,15 @@ struct pixel_pos {
 // Convert from Engineering value to pixel position.
 // @ X - Horisontal position
 // @ Y - Vertical position
-// @ m2P - meter to pixel conversion factor
+// @ x2P - x-axis to pixel conversion factor, from eng. unit to Pixels,(m, s)
+// @ y2P - y-axis to pixel conversion factor, from eng. unit to Pixels, (i.e. m)
 // @ Height, Width - Canvas dimension
 pixel_pos Conv2Pix(float X, float Y, //!<
-                   float m2P         //!<
-) {
+                   float X2P,        //!<
+                   float Y2P) {
   pixel_pos Result{};
-  Result.X = int(X * m2P) + (GetScreenWidth() >> 1);
-  Result.Y = int(-Y * m2P) + (GetScreenHeight() >> 1);
+  Result.X = int(X * X2P) + (GetScreenWidth() >> 1);
+  Result.Y = int(-Y * Y2P) + (GetScreenHeight() >> 1);
   return Result;
 };
 
@@ -71,12 +73,30 @@ struct data {
   float Fx{};         //!< Fourier calculated series value.
   int n{1};           //!< Fourier series number of terms.
   float m2Pixel{100}; //!< Meter 2 pixel conversion - multiplicator.
+  float s2Pixel{100}; //!< Seconds 2 pixel conversion - multiplicator.
   float dt{};
   float t{};
   std::vector<pixel_pos> vPixelPos{};
   std::vector<square_wave_elem> vSquareWaveElems{};
   std::vector<pixel_pos> vGridLines{};
 };
+
+//------------------------------------------------------------------------------
+// Compute fractals
+//------------------------------------------------------------------------------
+
+/**
+ * Compute Zn^2 + C
+ */
+Vector2 ComputeNext(Vector2 const &Current, Vector2 const &Constant) {
+  // Z^2
+  float const Zr = Current.x * Current.x - Current.y * Current.y;
+  float const Zi = 2.f * Current.x * Current.y;
+
+  // Add constant
+  Vector2 const Result{Zr + Constant.x, Zi + Constant.y};
+  return Result;
+}
 
 //----------------------------------------------------------------------------------
 // Module Functions Declaration
@@ -91,8 +111,8 @@ void UpdateDrawFrame(data *Data); // Update and Draw one frame
 // @ input term - the n'th term of the series.
 // @ return - the amplitude of the term.
 float FuncFourierSquareWaveAmplitude(int nthterm) {
-  constexpr float FourOverPI = 4.0 / M_PI;
-  return FourOverPI / (2.0 * float(nthterm) - 1.0);
+  constexpr float FourOverPI = 4.f / M_PI;
+  return FourOverPI / (2.f * float(nthterm) - 1.f);
 }
 
 //------------------------------------------------------------------------------
@@ -105,12 +125,12 @@ float FuncFourierSquareWave(std::vector<square_wave_elem> &vSquareWaveElems,
   float Sum{};
   float n{1};
   for (auto &E : vSquareWaveElems) {
-    auto const Angle{(2.0 * n - 1.0) * Omegat};
+    auto const Angle{(2.f * n - 1.f) * Omegat};
     E.Yn = E.Amplitude * std::sin((Angle));
     E.Xn = E.Amplitude * std::cos(Angle);
     E.Theta = Omegat;
     Sum += E.Yn;
-    n += 1.0;
+    n += 1.f;
   }
   return Sum;
 }
@@ -150,6 +170,48 @@ void InitFourierSquareWave(data &Data, int n) {
     Element.Yn = 0.0;
     Element.Theta = 0.0;
     Data.vSquareWaveElems.push_back(Element);
+  }
+}
+
+/*
+ * Convert from Engineering space to Grid space.
+ * This change of basis allows input of engineering X, Y values
+ * and the transformation to the coordinates for the Grid.
+ */
+auto ComputeGridPosition(Vector2 const &E, Vector2 const &I) -> Vector2 {
+  Matrix const InvM{1.f, 0.f, 0.f, -E.x, 0.f, 1.f, 0.f, -E.y,
+                    0.f, 0.f, 1.f, 0.f,  0.f, 0.f, 0.f, 1.f};
+  auto const V = Vector4{I.x, I.y, 0.f, 1.f};
+
+  /* Result = InvM * V */
+  Vector2 const Result{InvM.m0 * V.x + InvM.m12 * V.w,
+                       InvM.m5 * V.y + InvM.m13 * V.w};
+  return Result;
+}
+
+/**
+ * Test function for ComputeGridPosition.
+ */
+auto TestComputeGridPosition() -> void {
+
+  std::cout << __FUNCTION__ << "-> Run" << std::endl;
+
+  {
+    auto Result = ComputeGridPosition(Vector2{3.f, 1.f}, Vector2{0.f, 0.f});
+    auto const Expect = Vector2{-3.f, -1.f};
+
+    if (Result.x == Expect.x && Result.y == Expect.y)
+      std::cout << "SUCCESS!" << std::endl;
+    else
+      std::cerr << "FAILURE" << std::endl;
+  }
+  {
+    auto Result = ComputeGridPosition(Vector2{0.f, 0.f}, Vector2{1.f, 1.f});
+    auto const Expect = Vector2{1.f, 1.f};
+    if (Result.x == Expect.x && Result.y == Expect.y)
+      std::cout << "SUCCESS!" << std::endl;
+    else
+      std::cerr << "FAILURE" << std::endl;
   }
 }
 
@@ -230,8 +292,8 @@ auto vGridInPixels(float m2Pixel,               //!<
   }
 
   for (auto Elem : vGridPoint) {
-    Result.push_back(Conv2Pix(Elem.toX, Elem.toY, m2Pixel));
-    Result.push_back(Conv2Pix(Elem.fromX, Elem.fromY, m2Pixel));
+    Result.push_back(Conv2Pix(Elem.toX, Elem.toY, m2Pixel, m2Pixel));
+    Result.push_back(Conv2Pix(Elem.fromX, Elem.fromY, m2Pixel, m2Pixel));
   }
 
   return Result;
@@ -240,6 +302,9 @@ auto vGridInPixels(float m2Pixel,               //!<
 // Main Enry Point
 //----------------------------------------------------------------------------------
 int main() {
+
+  TestComputeGridPosition();
+
   data Data{};
   auto pData = &Data;
 
@@ -340,7 +405,7 @@ void UpdateDrawFrame(data *pData) {
   // NOTE: The circle defining the base of the Fourier series.
   //       Input here is wt (that is omega * t, which is 2*pi*f*t)
   // ---
-  float constexpr C0PosX = -3.f;
+  float constexpr C0PosX = -5.f;
   float constexpr C0PosY = 0.f;
   float const C0Radius = pData->vSquareWaveElems.at(0).Amplitude;
 
@@ -367,18 +432,20 @@ void UpdateDrawFrame(data *pData) {
     AccY += E.Yn;
 
     if (!Idx) {
-      auto const PixelPos = Conv2Pix(C0PosX, C0PosY, pData->m2Pixel);
+      auto const PixelPos =
+          Conv2Pix(C0PosX, C0PosY, pData->m2Pixel, pData->m2Pixel);
       DrawCircleLines(PixelPos.X, PixelPos.Y, Radius * pData->m2Pixel,
                       Fade(BLUE, 0.3f));
     } else {
-      auto const FourierTerm =
-          Conv2Pix(C0PosX + AccX, C0PosY + AccY, pData->m2Pixel);
+      auto const FourierTerm = Conv2Pix(C0PosX + AccX, C0PosY + AccY,
+                                        pData->m2Pixel, pData->m2Pixel);
       DrawCircleLines(FourierTerm.X, FourierTerm.Y, Radius * pData->m2Pixel,
                       Fade(BLUE, 0.3f));
 
       auto const CurrCircleLine =
           Conv2Pix(C0PosX + AccX + Radius * std::sin(E.Theta),
-                   C0PosY + AccY + Radius * std::cos(E.Theta), pData->m2Pixel);
+                   C0PosY + AccY + Radius * std::cos(E.Theta), pData->m2Pixel,
+                   pData->m2Pixel);
       DrawLine(CurrCircleLine.X, CurrCircleLine.Y, FourierTerm.X, FourierTerm.Y,
                Fade(BLACK, 1.0f));
     }
@@ -387,9 +454,9 @@ void UpdateDrawFrame(data *pData) {
   // ---
   // NOTE: Draw the connection line from the circle to the end of the plot.
   // ---
-  auto const IndLinePos1 = Conv2Pix(AccX, AccY, pData->m2Pixel);
-  auto const IndLinePos2 =
-      Conv2Pix(C0PosX + C0Radius * 1.2f + pData->Time, AccY, pData->m2Pixel);
+  auto const IndLinePos1 = Conv2Pix(AccX, AccY, pData->m2Pixel, pData->m2Pixel);
+  auto const IndLinePos2 = Conv2Pix(C0PosX + C0Radius * 1.2f + pData->Time,
+                                    AccY, pData->m2Pixel, pData->m2Pixel);
 
   pData->Time += 1.0 / pData->m2Pixel;
 
@@ -403,8 +470,8 @@ void UpdateDrawFrame(data *pData) {
   }
 
   auto const DrawStartPx =
-      Conv2Pix(C0PosX + AccX, C0PosY + AccY, pData->m2Pixel);
-  auto const C0PosPx = Conv2Pix(C0PosX, C0PosY, pData->m2Pixel);
+      Conv2Pix(C0PosX + AccX, C0PosY + AccY, pData->m2Pixel, pData->m2Pixel);
+  auto const C0PosPx = Conv2Pix(C0PosX, C0PosY, pData->m2Pixel, pData->m2Pixel);
 
   DrawLine(C0PosPx.X, C0PosPx.Y, DrawStartPx.X, DrawStartPx.Y,
            Fade(BLACK, 1.0f));
