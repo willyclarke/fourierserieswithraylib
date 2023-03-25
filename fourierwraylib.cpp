@@ -18,6 +18,7 @@
 #include "raylib.h"
 
 #include <cmath>
+#include <iomanip>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -81,6 +82,232 @@ struct data {
   std::vector<pixel_pos> vGridLines{};
 };
 
+/**
+ * es - enginnering support namespace
+ */
+namespace es // aka enginnering support
+{
+/**
+ * Identity matrix 4x4
+ */
+Matrix I() {
+  Matrix M{};
+  M.m0 = 1.f;
+  M.m5 = 1.f;
+  M.m10 = 1.f;
+  M.m15 = 1.f;
+  return M;
+}
+
+//------------------------------------------------------------------------------
+/**
+ * Return matrix 4x4 for conversion from engineering space to screen space.
+ * Screen space is a floating point representation with x,y,z = 0,0,0 beeing at
+ * the middle of the window.
+ */
+Matrix InitTranslationInv(Matrix const &M, float Ex, float Ey, float Ez) {
+  Matrix Mat = M;
+  // float m0, m4, m8, m12;  // Matrix first row (4 components)
+  // float m1, m5, m9, m13;  // Matrix second row (4 components)
+  // float m2, m6, m10, m14; // Matrix third row (4 components)
+  // float m3, m7, m11, m15; // Matrix fourth row (4 components)
+  Mat.m0 = 1.f;
+  Mat.m5 = 1.f;
+  Mat.m10 = 1.f;
+  Mat.m12 = -Ex;
+  Mat.m13 = -Ey;
+  Mat.m14 = -Ez;
+  Mat.m15 = 1.f;
+
+  return Mat;
+}
+
+/**
+ * Defintions: A point in 3D space has w set to 1.
+ *             A vector in 3D space has w set to 0.
+ *             This implies that adding Vectors gives a new Vector.
+ *             And Adding a Vector to a Point gives a new Point.
+ *             And there is no meaning in adding Points since w would not be 1.
+ */
+Vector4 Point(float X, float Y, float Z) { return Vector4{X, Y, Z, 1.f}; }
+
+/**
+ * Defintions: A point in 3D space has w set to 1.
+ *             A vector in 3D space has w set to 0.
+ *             This implies that adding Vectors gives a new Vector.
+ *             And Adding a Vector to a Point gives a new Point.
+ *             And there is no meaning in adding Points since w would not be 1.
+ */
+Vector4 Vector(float X, float Y, float Z) { return Vector4{X, Y, Z, 0.f}; }
+
+//------------------------------------------------------------------------------
+/**
+ * Return matrix 4x4 for conversion from engineering space to screen space.
+ * Screen space is a floating point representation with x,y,z = 0,0,0 beeing at
+ * the middle of the window.
+ */
+Matrix InitScaling(Matrix const &M, float Sx, float Sy, float Sz) {
+  Matrix Mat = M;
+  // float m0, m4, m8, m12;  // Matrix first row (4 components)
+  // float m1, m5, m9, m13;  // Matrix second row (4 components)
+  // float m2, m6, m10, m14; // Matrix third row (4 components)
+  // float m3, m7, m11, m15; // Matrix fourth row (4 components)
+  Mat.m0 = Sx;
+  Mat.m5 = Sy;
+  Mat.m10 = Sz;
+  Mat.m15 = 1.f;
+
+  return Mat;
+}
+
+/**
+ * Return the result of multiplication of a Matrix and a Vector, dimension 4.
+ */
+Vector4 Mul(Matrix const &M, Vector4 const &V) {
+  Vector4 Result{};
+  // float x;                // Vector x component
+  // float y;                // Vector y component
+  // float z;                // Vector z component
+  // float w;                // Vector w component
+  Result.x = M.m0 * V.x + M.m4 * V.y + M.m8 * V.z + M.m12 * V.w;
+  Result.y = M.m1 * V.x + M.m5 * V.y + M.m9 * V.z + M.m13 * V.w;
+  Result.z = M.m2 * V.x + M.m6 * V.y + M.m10 * V.z + M.m14 * V.w;
+  Result.w = M.m3 * V.x + M.m7 * V.y + M.m11 * V.z + M.m15 * V.w;
+  return Result;
+}
+
+//------------------------------------------------------------------------------
+float Mul(Vector4 const &V1, Vector4 const &V2) {
+  return V1.x * V2.x + V1.y * V2.y + V1.z * V2.z + V1.w * V2.w;
+}
+
+Matrix Mul(Matrix const &M1, Matrix const &M2) {
+  Matrix Result{};
+  // float m0, m4, m8, m12;  // Matrix first row (4 components)
+  // float m1, m5, m9, m13;  // Matrix second row (4 components)
+  // float m2, m6, m10, m14; // Matrix third row (4 components)
+  // float m3, m7, m11, m15; // Matrix fourth row (4 components)
+  Result.m0 = Mul(Vector4{M1.m0, M1.m4, M1.m8, M1.m12},
+                  Vector4{M2.m0, M2.m1, M2.m2, M2.m3});
+  Result.m1 = Mul(Vector4{M1.m1, M1.m5, M1.m9, M1.m13},
+                  Vector4{M2.m0, M2.m1, M2.m2, M2.m3});
+  Result.m2 = Mul(Vector4{M1.m2, M1.m6, M1.m10, M1.m14},
+                  Vector4{M2.m0, M2.m1, M2.m2, M2.m3});
+  Result.m3 = Mul(Vector4{M1.m3, M1.m7, M1.m11, M1.m15},
+                  Vector4{M2.m0, M2.m1, M2.m2, M2.m3});
+
+  Result.m4 = Mul(Vector4{M1.m0, M1.m4, M1.m8, M1.m12},
+                  Vector4{M2.m4, M2.m5, M2.m6, M2.m7});
+  Result.m5 = Mul(Vector4{M1.m1, M1.m5, M1.m9, M1.m13},
+                  Vector4{M2.m4, M2.m5, M2.m6, M2.m7});
+  Result.m6 = Mul(Vector4{M1.m2, M1.m6, M1.m10, M1.m14},
+                  Vector4{M2.m4, M2.m5, M2.m6, M2.m7});
+  Result.m7 = Mul(Vector4{M1.m3, M1.m7, M1.m11, M1.m15},
+                  Vector4{M2.m4, M2.m5, M2.m6, M2.m7});
+
+  Result.m8 = Mul(Vector4{M1.m0, M1.m4, M1.m8, M1.m12},
+                  Vector4{M2.m8, M2.m9, M2.m10, M2.m11});
+  Result.m9 = Mul(Vector4{M1.m1, M1.m5, M1.m9, M1.m13},
+                  Vector4{M2.m8, M2.m9, M2.m10, M2.m11});
+  Result.m10 = Mul(Vector4{M1.m2, M1.m6, M1.m10, M1.m14},
+                   Vector4{M2.m8, M2.m9, M2.m10, M2.m11});
+  Result.m11 = Mul(Vector4{M1.m3, M1.m7, M1.m11, M1.m15},
+                   Vector4{M2.m8, M2.m9, M2.m10, M2.m11});
+
+  Result.m12 = Mul(Vector4{M1.m0, M1.m4, M1.m8, M1.m12},
+                   Vector4{M2.m12, M2.m13, M2.m14, M2.m15});
+  Result.m13 = Mul(Vector4{M1.m1, M1.m5, M1.m9, M1.m13},
+                   Vector4{M2.m12, M2.m13, M2.m14, M2.m15});
+  Result.m14 = Mul(Vector4{M1.m2, M1.m6, M1.m10, M1.m14},
+                   Vector4{M2.m12, M2.m13, M2.m14, M2.m15});
+  Result.m15 = Mul(Vector4{M1.m3, M1.m7, M1.m11, M1.m15},
+                   Vector4{M2.m12, M2.m13, M2.m14, M2.m15});
+  return Result;
+}
+
+}; // namespace es
+
+Matrix operator*(Matrix const &M1, Matrix const &M2) { return es::Mul(M1, M2); }
+bool operator==(Matrix const &M1, Matrix const &M2) {
+  auto const Result = M1.m0 == M2.m0 &&   //!<
+                      M1.m1 == M2.m1 &&   //!<
+                      M1.m2 == M2.m2 &&   //!<
+                      M1.m3 == M2.m3 &&   //!<
+                      M1.m4 == M2.m4 &&   //!<
+                      M1.m5 == M2.m5 &&   //!<
+                      M1.m6 == M2.m6 &&   //!<
+                      M1.m7 == M2.m7 &&   //!<
+                      M1.m8 == M2.m8 &&   //!<
+                      M1.m9 == M2.m9 &&   //!<
+                      M1.m10 == M2.m10 && //!<
+                      M1.m11 == M2.m11 && //!<
+                      M1.m12 == M2.m12 && //!<
+                      M1.m13 == M2.m13 && //!<
+                      M1.m14 == M2.m14 && //!<
+                      M1.m15 == M2.m15    //!<
+      ;
+  return Result;
+}
+bool operator!=(Matrix const &M1, Matrix const &M2) {
+  auto const Result = !(M1 == M2);
+  return Result;
+}
+Vector4 operator*(Matrix const &M, Vector4 const &V) { return es::Mul(M, V); }
+float operator*(Vector4 const &V1, Vector4 const &V2) {
+  return es::Mul(V1, V2);
+}
+//
+// ---
+// NOTE: Stream operator
+// ---
+std::ostream &operator<<(std::ostream &stream, const Vector4 &T) {
+  // ---
+  // NOTE: The width need to be big enough to hold a negative sign.
+  // ---
+  size_t const P{5};
+  size_t const W{P + 5};
+  stream << ((T.w != 0) ? "Point :" : "Vector:");
+  stream << " " << std::fixed << std::setprecision(P) << std::setw(W) << T.x
+         << " " << std::fixed << std::setprecision(P) << std::setw(W) << T.y
+         << " " << std::fixed << std::setprecision(P) << std::setw(W) << T.z
+         << " " << std::fixed << std::setprecision(P) << std::setw(W) << T.w;
+  return stream;
+}
+
+//------------------------------------------------------------------------------
+std::ostream &operator<<(std::ostream &stream, const Matrix &M) {
+  // ---
+  // NOTE: The width need to be big enough to hold a negative sign.
+  // ---
+  // float m0, m4, m8, m12;  // Matrix first row (4 components)
+  // float m1, m5, m9, m13;  // Matrix second row (4 components)
+  // float m2, m6, m10, m14; // Matrix third row (4 components)
+  // float m3, m7, m11, m15; // Matrix fourth row (4 components)
+  size_t const P{5};
+  size_t const W{P + 5};
+  stream << "Matrix\n";
+  stream << " " << std::fixed << std::setprecision(P) << std::setw(W) << M.m0
+         << " " << std::fixed << std::setprecision(P) << std::setw(W) << M.m4
+         << " " << std::fixed << std::setprecision(P) << std::setw(W) << M.m8
+         << " " << std::fixed << std::setprecision(P) << std::setw(W) << M.m12
+         << "\n";
+  stream << " " << std::fixed << std::setprecision(P) << std::setw(W) << M.m1
+         << " " << std::fixed << std::setprecision(P) << std::setw(W) << M.m5
+         << " " << std::fixed << std::setprecision(P) << std::setw(W) << M.m9
+         << " " << std::fixed << std::setprecision(P) << std::setw(W) << M.m13
+         << "\n";
+  stream << " " << std::fixed << std::setprecision(P) << std::setw(W) << M.m2
+         << " " << std::fixed << std::setprecision(P) << std::setw(W) << M.m6
+         << " " << std::fixed << std::setprecision(P) << std::setw(W) << M.m10
+         << " " << std::fixed << std::setprecision(P) << std::setw(W) << M.m14
+         << "\n";
+  stream << " " << std::fixed << std::setprecision(P) << std::setw(W) << M.m3
+         << " " << std::fixed << std::setprecision(P) << std::setw(W) << M.m7
+         << " " << std::fixed << std::setprecision(P) << std::setw(W) << M.m11
+         << " " << std::fixed << std::setprecision(P) << std::setw(W) << M.m15
+         << "\n";
+  return stream;
+}
 //------------------------------------------------------------------------------
 // Compute fractals
 //------------------------------------------------------------------------------
@@ -215,6 +442,169 @@ auto TestComputeGridPosition() -> void {
   }
 }
 
+//------------------------------------------------------------------------------
+auto Test3dCalucations() -> void {
+
+  Matrix M{};
+
+  // Move from enginnering space to screen space
+  // i.e. The center of the screen will be at x=3,y=4
+  M = es::InitTranslationInv({}, 3.f, 4.f, 0.f);
+  {
+    Vector4 const V = M * Vector4{0.f, 0.f, 0.f, 1.f};
+    // Expected output is -3, -4
+    if (V.x != -3.f || V.y != -4.f)
+      std::cerr << "Failed to compute screen coordinates. Line:" << __LINE__
+                << std::endl;
+    //
+  }
+  {
+    Vector4 const V = M * es::Point(3.f, 0.f, 0.f);
+    // Expected output is 0, -4
+    if (V.x != 0.f || V.y != -4.f) {
+      std::cerr << "Failed to compute screen coordinates. Line:" << __LINE__
+                << std::endl;
+      std::cerr << M << std::endl;
+      std::cerr << V << std::endl;
+    }
+  }
+
+  M = es::InitScaling({}, 2.f, 3.f, 4.f);
+  std::cout << M << std::endl;
+
+  // NOTE: Scaling applies to vectors and points.
+  Vector4 const Po = M * Vector4{-4.f, 6.f, 8.f, 1.f};
+  if (Po.x != -8.f || Po.y != 18.f || Po.z != 32.f)
+    std::cerr << "Failed to compute scaling. Line:" << __LINE__ << std::endl;
+
+  Vector4 const Vector = M * Vector4{-4.f, 6.f, 8.f, 0.f};
+  if (Vector.x != -8.f || Vector.y != 18.f || Vector.z != 32.f) {
+    std::cerr << "Failed to compute scaling. Line:" << __LINE__ << std::endl;
+
+    std::cout << Po << std::endl;
+    std::cout << Vector << std::endl;
+  }
+
+  // ---
+  // Test Point multiplication with matrix.
+  // ---
+  {
+    Matrix M2{
+        1.f, 2.f, 3.f, 4.f, //<!
+        2.f, 4.f, 4.f, 2.f, //<!
+        8.f, 6.f, 4.f, 1.f, //<!
+        0.f, 0.f, 0.f, 1.f  //!<
+    };
+
+    Vector4 const P = es::Point(1.f, 2.f, 3.f);
+    auto const Result = es::Mul(M2, P);
+    if (Result.x != 18.f || Result.y != 24.f || Result.z != 33.f ||
+        Result.w != 1.f) {
+
+      std::cerr << "Failed to compute Matrix multiplicator, Line: " << __LINE__
+                << std::endl;
+
+      std::cout << M2 << std::endl;
+      std::cout << Result << std::endl;
+    }
+  }
+
+  // ---
+  // Test Point multiplication with matrix using operators.
+  // ---
+  {
+    Matrix M2{
+        1.f, 2.f, 3.f, 4.f, //<!
+        2.f, 4.f, 4.f, 2.f, //<!
+        8.f, 6.f, 4.f, 1.f, //<!
+        0.f, 0.f, 0.f, 1.f  //!<
+    };
+
+    Vector4 const P = es::Point(1.f, 2.f, 3.f);
+    auto const Result = M2 * P;
+    if (Result.x != 18.f || Result.y != 24.f || Result.z != 33.f ||
+        Result.w != 1.f) {
+
+      std::cerr << "Failed to compute Matrix multiplicator, Line: " << __LINE__
+                << std::endl;
+
+      std::cout << M2 << std::endl;
+      std::cout << Result << std::endl;
+    }
+  }
+
+  // ---
+  // Test Matrix multiplication with Matrix
+  // ---
+  {
+    Matrix A{
+        1.f, 2.f, 3.f, 4.f, //!<
+        5.f, 6.f, 7.f, 8.f, //!<
+        9.f, 8.f, 7.f, 6.f, //!<
+        5.f, 4.f, 3.f, 2.f  //!<
+    };
+    Matrix B{
+        -2.f, 1.f, 2.f, 3.f,  //!<
+        3.f,  2.f, 1.f, -1.f, //!<
+        4.f,  3.f, 6.f, 5.f,  //!<
+        1.f,  2.f, 7.f, 8.f   //!<
+    };
+    Matrix Expect{
+        20.f, 22.f, 50.f,  48.f,  //!<
+        44.f, 54.f, 114.f, 108.f, //!<
+        40.f, 58.f, 110.f, 102.f, //!<
+        16.f, 26.f, 46.f,  42.f   //!<
+    };
+
+    auto const M = A * B;
+    if (M != Expect) {
+      std::cerr << "Matrix multiplication failed. Line: " << __LINE__
+                << std::endl;
+      std::cerr << "Calculated Matrix:" << M << std::endl;
+      std::cerr << "Expected Matrix:" << Expect << std::endl;
+    }
+  }
+}
+
+/**
+ * Test changes from coordinate system to screen coordinates.
+ */
+auto Test3dScreenCalculations() -> void {
+  // Given the enginnering input
+  auto const EngPoint = es::Point(0.f, 0.f, 0.f);
+
+  // Compute the screen coordinates
+
+  auto const MatEng2Screen = es::InitTranslationInv({}, 0.f, 0.f, 0.f);
+  auto const ScreenPoint = MatEng2Screen * EngPoint;
+
+  std::cout << "Engineering2Screen Matrix: " << MatEng2Screen << std::endl;
+  std::cout << "Eng coord    :" << EngPoint << std::endl;
+  std::cout << "Screen coord :" << ScreenPoint << std::endl;
+
+  auto const MatScreen2Pixel = es::InitScaling({}, 100.f, 100.f, 100.f);
+  auto const PixelPoint = MatScreen2Pixel * ScreenPoint;
+  std::cout << "Screen2Pixel Matrix: " << MatScreen2Pixel << std::endl;
+  std::cout << "Pixel point  :" << PixelPoint << std::endl;
+
+  auto const MatPixelTranslation =
+      es::InitTranslationInv({}, -1280.f / 2.f, -1024.f / 2.f, 0.f);
+
+  {
+    auto const PixelPos = MatPixelTranslation * PixelPoint;
+    std::cout << "Pixel positi :" << PixelPos << std::endl;
+  }
+
+  // ---
+  // Combine all the matrixes into one by multiplication.
+  // ---
+  {
+    auto const M = MatEng2Screen * MatScreen2Pixel * MatPixelTranslation;
+    auto const PixelPos = MatPixelTranslation * PixelPoint;
+    std::cout << "Pixel xositi :" << PixelPos << std::endl;
+  }
+}
+
 /*
  * Create lines and ticks for a grid in engineering units.
  */
@@ -304,6 +694,9 @@ auto vGridInPixels(float m2Pixel,               //!<
 int main() {
 
   TestComputeGridPosition();
+  Test3dCalucations();
+  Test3dScreenCalculations();
+  return 0;
 
   data Data{};
   auto pData = &Data;
