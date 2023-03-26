@@ -31,6 +31,10 @@
 // Global Variables Definition
 //----------------------------------------------------------------------------------
 //------------------------------------------------------------------------------
+
+/**
+ * Hold pixel position as integers, X and Y.
+ */
 struct pixel_pos {
   int X{};
   int Y{};
@@ -68,6 +72,7 @@ struct data {
   int Key{};
   int KeyPrv{};
   bool StopUpdate{};
+  bool ShowGrid{true};
   float X{};
   float Y{};
   float Time{};
@@ -80,6 +85,7 @@ struct data {
   std::vector<pixel_pos> vPixelPos{};
   std::vector<square_wave_elem> vSquareWaveElems{};
   std::vector<pixel_pos> vGridLines{};
+  Matrix MatPixel{};
 };
 
 /**
@@ -105,7 +111,7 @@ Matrix I() {
  * Screen space is a floating point representation with x,y,z = 0,0,0 beeing at
  * the middle of the window.
  */
-Matrix InitTranslationInv(Matrix const &M, float Ex, float Ey, float Ez) {
+Matrix InitTranslationInv(Matrix const &M, Vector4 const &vTranslation) {
   Matrix Mat = M;
   // float m0, m4, m8, m12;  // Matrix first row (4 components)
   // float m1, m5, m9, m13;  // Matrix second row (4 components)
@@ -114,9 +120,9 @@ Matrix InitTranslationInv(Matrix const &M, float Ex, float Ey, float Ez) {
   Mat.m0 = 1.f;
   Mat.m5 = 1.f;
   Mat.m10 = 1.f;
-  Mat.m12 = -Ex;
-  Mat.m13 = -Ey;
-  Mat.m14 = -Ez;
+  Mat.m12 = -vTranslation.x;
+  Mat.m13 = -vTranslation.y;
+  Mat.m14 = -vTranslation.z;
   Mat.m15 = 1.f;
 
   return Mat;
@@ -146,15 +152,17 @@ Vector4 Vector(float X, float Y, float Z) { return Vector4{X, Y, Z, 0.f}; }
  * Screen space is a floating point representation with x,y,z = 0,0,0 beeing at
  * the middle of the window.
  */
-Matrix InitScaling(Matrix const &M, float Sx, float Sy, float Sz) {
+Matrix InitScaling(Matrix const &M, Vector4 const &Scale,
+                   bool Reflection = false) {
   Matrix Mat = M;
   // float m0, m4, m8, m12;  // Matrix first row (4 components)
   // float m1, m5, m9, m13;  // Matrix second row (4 components)
   // float m2, m6, m10, m14; // Matrix third row (4 components)
   // float m3, m7, m11, m15; // Matrix fourth row (4 components)
-  Mat.m0 = Sx;
-  Mat.m5 = Sy;
-  Mat.m10 = Sz;
+  auto const Sign = Reflection ? -1.f : 1.f;
+  Mat.m0 = Sign * Scale.x;
+  Mat.m5 = Sign * Scale.y;
+  Mat.m10 = Sign * Scale.z;
   Mat.m15 = 1.f;
 
   return Mat;
@@ -330,7 +338,8 @@ Vector2 ComputeNext(Vector2 const &Current, Vector2 const &Constant) {
 //
 
 //----------------------------------------------------------------------------------
-void UpdateDrawFrame(data *Data); // Update and Draw one frame
+void UpdateDrawFrame(data *Data);  // Update and Draw one frame
+void UpdateDrawFrame2(data *Data); // Update and Draw one frame
 
 //------------------------------------------------------------------------------
 // @ desc Compute the amplitude of a single term of the Fourier based square
@@ -449,7 +458,7 @@ auto Test3dCalucations() -> void {
 
   // Move from enginnering space to screen space
   // i.e. The center of the screen will be at x=3,y=4
-  M = es::InitTranslationInv({}, 3.f, 4.f, 0.f);
+  M = es::InitTranslationInv({}, es::Point(3.f, 4.f, 0.f));
   {
     Vector4 const V = M * Vector4{0.f, 0.f, 0.f, 1.f};
     // Expected output is -3, -4
@@ -469,7 +478,7 @@ auto Test3dCalucations() -> void {
     }
   }
 
-  M = es::InitScaling({}, 2.f, 3.f, 4.f);
+  M = es::InitScaling({}, es::Point(2.f, 3.f, 4.f));
   std::cout << M << std::endl;
 
   // NOTE: Scaling applies to vectors and points.
@@ -571,52 +580,92 @@ auto Test3dCalucations() -> void {
  */
 auto Test3dScreenCalculations() -> void {
   // Given the enginnering input
-  auto const EngPoint = es::Point(0.f, 0.f, 0.f);
+  auto const Pe = es::Point(0.f, 0.f, 0.f);
 
-  // Compute the screen coordinates
+  // Compute the screen coordinates - aka Matrix Screen = Ms
+  auto const Ms = es::InitTranslationInv({}, es::Point(0.f, 0.f, 0.f));
+  auto const Ps = Ms * Pe;
 
-  auto const MatEng2Screen = es::InitTranslationInv({}, 0.f, 0.f, 0.f);
-  auto const ScreenPoint = MatEng2Screen * EngPoint;
+  std::cout << "Ms : " << Ms << std::endl;
+  std::cout << "Pe :" << Pe << std::endl;
+  std::cout << "Ps :" << Ps << std::endl;
 
-  std::cout << "Engineering2Screen Matrix: " << MatEng2Screen << std::endl;
-  std::cout << "Eng coord    :" << EngPoint << std::endl;
-  std::cout << "Screen coord :" << ScreenPoint << std::endl;
+  // Compute the scaling into pixel space - aka Matrix Pixel Scale = Mps
+  // That gives the Pixel Point Pp.
+  auto const Mps = es::InitScaling({}, es::Point(100.f, 100.f, 100.f));
+  auto const Pps = Mps * Ps;
 
-  auto const MatScreen2Pixel = es::InitScaling({}, 100.f, 100.f, 100.f);
-  auto const PixelPoint = MatScreen2Pixel * ScreenPoint;
-  std::cout << "Screen2Pixel Matrix: " << MatScreen2Pixel << std::endl;
-  std::cout << "Pixel point  :" << PixelPoint << std::endl;
+  std::cout << "Mps: " << Mps << std::endl;
+  std::cout << "Pps:" << Pps << std::endl;
 
-  auto const MatPixelTranslation =
-      es::InitTranslationInv({}, -1280.f / 2.f, -1024.f / 2.f, 0.f);
+  // Compute the translation onto the screen based on 0,0 beeing top left of
+  // screen
+  // Matrix Translation - aka Mpt
+  auto const Mpt =
+      es::InitTranslationInv({}, es::Point(-1280.f / 2.f, -1024.f / 2.f, 0.f));
+  std::cout << "Mpt:" << Mpt << std::endl;
 
   {
-    auto const PixelPos = MatPixelTranslation * PixelPoint;
-    std::cout << "Pixel positi :" << PixelPos << std::endl;
+    auto const Pp = Mpt * Pps;
+    std::cout << "Pp :" << Pp << std::endl;
   }
 
   // ---
   // Combine all the matrixes into one by multiplication.
   // ---
   {
-    auto const M = MatEng2Screen * MatScreen2Pixel * MatPixelTranslation;
-    auto const PixelPos = MatPixelTranslation * PixelPoint;
+    auto const M = Mpt * Mps * Ms;
+    auto const PixelPos = Mpt * Pps;
+    std::cout << "Resulting Matrix:" << M << std::endl;
     std::cout << "Pixel xositi :" << PixelPos << std::endl;
+    std::cout << "Pixel cositi :" << M * Pe << std::endl;
   }
+}
+
+/**
+ * Initialize the matrix to convert from enginnering basis to screen basis.
+ * The screen center is used as the reference point.
+ *
+ * @OrigoScreen - the X, Y, Z values in enginnering space at center of screen.
+ * @PixelsPerUnit - The number of pixels per unit, i.e 100 pixels equals 1m.
+ * @ScreenCenterInPixels - The coordinates for the centre of the screen in
+ * pixels.
+ */
+auto InitEng2PixelMatrix(Vector4 const &OrigoScreen,
+                         Vector4 const &PixelsPerUnit,
+                         Vector4 const &ScreenCenterInPixels) -> Matrix {
+
+  auto const Ms = es::InitTranslationInv({}, OrigoScreen);
+
+  auto const Reflection = true;
+  auto const Mps = es::InitScaling({}, PixelsPerUnit, Reflection);
+  auto const Mpt = es::InitTranslationInv(
+      {}, es::Point(-ScreenCenterInPixels.x, -ScreenCenterInPixels.y,
+                    -ScreenCenterInPixels.z));
+
+  // ---
+  // Combine all the matrixes into one by multiplication.
+  // ---
+  auto const M = Mpt * Mps * Ms;
+  std::cout << "MatEng2Screen:" << Ms << std::endl;
+  std::cout << "MatScreen2Pixel:" << Mps << std::endl;
+  std::cout << "MatPixelTranslation:" << Mpt << std::endl;
+  std::cout << "Resulting Matrix:" << M << std::endl;
+
+  return M;
 }
 
 /*
  * Create lines and ticks for a grid in engineering units.
  */
 auto vGridInPixels(float m2Pixel,               //!<
+                   Matrix const &MatPix,        //!<
                    float GridXLowerLeft = -2.f, //!<
                    float GridYLowerLeft = -3.f, //!<
-                   float GridLength = 6.f,      //!<
+                   float GridLength = 4.f,      //!<
                    float GridHeigth = 6.f,      //!<
                    float TickDistance = 0.1f    //!<
                    ) -> std::vector<pixel_pos> {
-
-  std::vector<pixel_pos> Result{};
 
   // ---
   // NOTE: Make and draw a grid.
@@ -681,9 +730,14 @@ auto vGridInPixels(float m2Pixel,               //!<
     vGridPoint.push_back(grid_point{PosX0, PosY0, PosX1, PosY1});
   }
 
+  std::vector<pixel_pos> Result{};
   for (auto Elem : vGridPoint) {
-    Result.push_back(Conv2Pix(Elem.toX, Elem.toY, m2Pixel, m2Pixel));
-    Result.push_back(Conv2Pix(Elem.fromX, Elem.fromY, m2Pixel, m2Pixel));
+    // Result.push_back(Conv2Pix(Elem.toX, Elem.toY, m2Pixel, m2Pixel));
+    // Result.push_back(Conv2Pix(Elem.fromX, Elem.fromY, m2Pixel, m2Pixel));
+    auto const to = MatPix * es::Point(Elem.toX, Elem.toY, 0.f);
+    auto const from = MatPix * es::Point(Elem.fromX, Elem.fromY, 0.f);
+    Result.push_back({int(to.x), int(to.y)});
+    Result.push_back({int(from.x), int(from.y)});
   }
 
   return Result;
@@ -696,7 +750,6 @@ int main() {
   TestComputeGridPosition();
   Test3dCalucations();
   Test3dScreenCalculations();
-  return 0;
 
   data Data{};
   auto pData = &Data;
@@ -709,10 +762,14 @@ int main() {
 #if defined(PLATFORM_WEB)
   emscripten_set_main_loop(UpdateDrawFrame, 0, 1);
 #else
-  SetTargetFPS(120); // Set our game to run at 60 frames-per-second
+  SetTargetFPS(60); // Set our game to run at 60 frames-per-second
   //--------------------------------------------------------------------------------------
 
-  Data.vGridLines = vGridInPixels(Data.m2Pixel);
+  Data.MatPixel = InitEng2PixelMatrix(
+      {}, {Data.m2Pixel, Data.m2Pixel, 0.f, 0.f},
+      {Data.screenWidth / 2.f, Data.screenHeight / 2.f, 0.f, 0.f});
+
+  Data.vGridLines = vGridInPixels(Data.m2Pixel, Data.MatPixel);
 
   int constexpr NumTerms = 5;
   InitFourierSquareWave(Data, NumTerms);
@@ -726,7 +783,7 @@ int main() {
       Data.t = GetTime();
     Data.Key = GetKeyPressed();
 
-    UpdateDrawFrame(pData);
+    UpdateDrawFrame2(pData);
   }
 #endif
 
@@ -857,7 +914,7 @@ void UpdateDrawFrame(data *pData) {
       (pData->Time > (GetScreenWidth() - IndLinePos1.X) / pData->m2Pixel)) {
     pData->Time = 0.0;
     pData->vPixelPos.clear();
-    pData->vGridLines = vGridInPixels(pData->m2Pixel);
+    pData->vGridLines = vGridInPixels(pData->m2Pixel, pData->MatPixel);
     InitFourierSquareWave(*pData, pData->n);
     return;
   }
@@ -884,4 +941,101 @@ void UpdateDrawFrame(data *pData) {
 
   EndDrawing();
   //----------------------------------------------------------------------------------
+}
+
+/**
+ * Second version of the drawing Functions
+ */
+void UpdateDrawFrame2(data *pData) {
+  // Update
+  //----------------------------------------------------------------------------------
+  // TODO: Update your variables here
+  //----------------------------------------------------------------------------------
+
+  // Draw
+  //----------------------------------------------------------------------------------
+  BeginDrawing();
+
+  ClearBackground(RAYWHITE);
+
+  DrawText(
+      std::string("Use arrow keys. Zoom: " + std::to_string(pData->m2Pixel))
+          .c_str(),
+      140, 10, 20, BLUE);
+  DrawText(std::string("Num terms: " + std::to_string(pData->n) +
+                       ". Key:" + std::to_string(pData->KeyPrv))
+               .c_str(),
+           140, 40, 20, BLUE);
+
+  bool InputChanged{};
+
+  if (pData->Key) {
+    if (KEY_G == pData->Key) {
+      pData->ShowGrid = !pData->ShowGrid;
+      InputChanged = true;
+    } else if (KEY_DOWN == pData->Key) {
+      pData->m2Pixel -= 10.0;
+      InputChanged = true;
+    } else if (KEY_UP == pData->Key) {
+      pData->m2Pixel += 10.0;
+      InputChanged = true;
+    } else if (KEY_LEFT == pData->Key) {
+      --pData->n;
+      InputChanged = true;
+    } else if (KEY_RIGHT == pData->Key) {
+      ++pData->n;
+      InputChanged = true;
+    } else if (KEY_SPACE == pData->Key) {
+      InputChanged = true;
+      pData->StopUpdate = !pData->StopUpdate;
+    }
+
+    pData->KeyPrv = pData->Key;
+  }
+
+  if (InputChanged) {
+    pData->Time = 0.0;
+    pData->vPixelPos.clear();
+    pData->vGridLines = vGridInPixels(pData->m2Pixel, pData->MatPixel);
+    InitFourierSquareWave(*pData, pData->n);
+    pData->MatPixel = InitEng2PixelMatrix(
+        {}, {pData->m2Pixel, pData->m2Pixel, 0.f, 0.f},
+        {pData->screenWidth / 2.f, pData->screenHeight / 2.f, 0.f, 0.f});
+
+    return;
+  }
+
+  if (pData->ShowGrid) {
+    for (size_t Idx = 0; Idx < pData->vGridLines.size(); Idx += 2) {
+      auto const &Elem0 = pData->vGridLines[Idx];
+      auto const &Elem1 = pData->vGridLines[Idx + 1];
+      DrawLine(Elem0.X, Elem0.Y, Elem1.X, Elem1.Y, Fade(VIOLET, 1.0f));
+    }
+  }
+
+  // ---
+  // NOTE: Lamda to draw a point.
+  // ---
+  auto DrawPoint = [](Matrix const &MatPixel, Vector4 const &P, float m2Pixel,
+                      bool Print = false) -> void {
+    auto CurvePoint = MatPixel * P;
+    DrawPixel(CurvePoint.x, CurvePoint.y, RED);
+    constexpr float Radius = 0.1f;
+    DrawCircleLines(CurvePoint.x, CurvePoint.y, Radius * m2Pixel,
+                    Fade(BLUE, 0.3f));
+    DrawLine(CurvePoint.x, CurvePoint.y, 0, 0, BLUE);
+    if (Print)
+      DrawText(std::string("CurvePoint x/y: " + std::to_string(CurvePoint.x) +
+                           " / " + std::to_string(CurvePoint.y))
+                   .c_str(),
+               140, 70, 20, BLUE);
+  };
+
+  DrawPoint(pData->MatPixel, es::Point(0.f, 0.f, 0.f), pData->m2Pixel, true);
+  DrawPoint(pData->MatPixel, es::Point(1.f, 1.f, 0.f), pData->m2Pixel);
+  DrawPoint(pData->MatPixel, es::Point(1.f, -1.f, 0.f), pData->m2Pixel);
+  DrawPoint(pData->MatPixel, es::Point(-1.f, 1.f, 0.f), pData->m2Pixel);
+  DrawPoint(pData->MatPixel, es::Point(-1.f, -1.f, 0.f), pData->m2Pixel);
+
+  EndDrawing();
 }
