@@ -437,48 +437,6 @@ void InitFourierSquareWave(data &Data, int n) {
   }
 }
 
-/*
- * Convert from Engineering space to Grid space.
- * This change of basis allows input of engineering X, Y values
- * and the transformation to the coordinates for the Grid.
- */
-auto ComputeGridPosition(Vector2 const &E, Vector2 const &I) -> Vector2 {
-  Matrix const InvM{1.f, 0.f, 0.f, -E.x, 0.f, 1.f, 0.f, -E.y,
-                    0.f, 0.f, 1.f, 0.f,  0.f, 0.f, 0.f, 1.f};
-  auto const V = Vector4{I.x, I.y, 0.f, 1.f};
-
-  /* Result = InvM * V */
-  Vector2 const Result{InvM.m0 * V.x + InvM.m12 * V.w,
-                       InvM.m5 * V.y + InvM.m13 * V.w};
-  return Result;
-}
-
-/**
- * Test function for ComputeGridPosition.
- */
-auto TestComputeGridPosition() -> void {
-
-  std::cout << __FUNCTION__ << "-> Run" << std::endl;
-
-  {
-    auto Result = ComputeGridPosition(Vector2{3.f, 1.f}, Vector2{0.f, 0.f});
-    auto const Expect = Vector2{-3.f, -1.f};
-
-    if (Result.x == Expect.x && Result.y == Expect.y)
-      std::cout << "SUCCESS!" << std::endl;
-    else
-      std::cerr << "FAILURE" << std::endl;
-  }
-  {
-    auto Result = ComputeGridPosition(Vector2{0.f, 0.f}, Vector2{1.f, 1.f});
-    auto const Expect = Vector2{1.f, 1.f};
-    if (Result.x == Expect.x && Result.y == Expect.y)
-      std::cout << "SUCCESS!" << std::endl;
-    else
-      std::cerr << "FAILURE" << std::endl;
-  }
-}
-
 //------------------------------------------------------------------------------
 auto Test3dCalucations() -> void {
 
@@ -822,8 +780,6 @@ void Test2() {
 int main() {
 
   // Test2();
-  // return 0;
-  TestComputeGridPosition();
   Test3dCalucations();
   Test3dScreenCalculations();
 
