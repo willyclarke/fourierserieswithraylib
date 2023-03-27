@@ -79,14 +79,16 @@ struct data {
   float Fx{};               //!< Fourier calculated series value.
   int n{1};                 //!< Fourier series number of terms.
   float PixelsPerUnit{100}; //!< Meter 2 pixel conversion - multiplicator.
-  float s2Pixel{100};       //!< Seconds 2 pixel conversion - multiplicator.
   float dt{};
   float t{};
   std::vector<pixel_pos> vPixelPos{};
   std::vector<square_wave_elem> vSquareWaveElems{};
   std::vector<pixel_pos> vGridLines{};
-  Matrix MatPixel{};
-  Vector4 vEngOffset{};
+
+  Matrix Hep{}; //!< Homogenous matrix for conversion from enginnering space to
+                //!< pixelspace.
+
+  Vector4 vEngOffset{}; //!< Position of figure in enginnering space.
   Vector4 vPixelsPerUnit{100.f, 100.f, 100.f, 0.f};
 };
 
@@ -685,9 +687,7 @@ auto InitEng2PixelMatrix(Vector4 const &OrigoScreen,
 /*
  * Create lines and ticks for a grid in engineering units.
  */
-auto vGridInPixels(float PixelsPerUnit, //!< Conversion factor from enginnering
-                                        //!< value top pixel. i.e. PixelsPerUnit
-                   Matrix const &Hep, //!< Homogenous matrix from enginnering to
+auto vGridInPixels(Matrix const &Hep, //!< Homogenous matrix from enginnering to
                                       //!< pixel position.
                    float GridXLowerLeft = -4.f, //!<
                    float GridYLowerLeft = -3.f, //!<
@@ -847,11 +847,11 @@ int main() {
   Data.vEngOffset = es::Point(0.f, 0.f, 0.f);
   Data.vPixelsPerUnit = es::Point(100.f, 50.f, 0.f);
 
-  Data.MatPixel = InitEng2PixelMatrix(
+  Data.Hep = InitEng2PixelMatrix(
       Data.vEngOffset, Data.vPixelsPerUnit,
       {Data.screenWidth / 2.f, Data.screenHeight / 2.f, 0.f, 0.f});
 
-  Data.vGridLines = vGridInPixels(Data.PixelsPerUnit, Data.MatPixel);
+  Data.vGridLines = vGridInPixels(Data.Hep);
 
   int constexpr NumTerms = 5;
   InitFourierSquareWave(Data, NumTerms);
@@ -999,7 +999,7 @@ void UpdateDrawFrame(data *pData) {
                                          pData->PixelsPerUnit)) {
     pData->Time = 0.0;
     pData->vPixelPos.clear();
-    pData->vGridLines = vGridInPixels(pData->PixelsPerUnit, pData->MatPixel);
+    pData->vGridLines = vGridInPixels(pData->Hep);
     InitFourierSquareWave(*pData, pData->n);
     return;
   }
@@ -1068,7 +1068,8 @@ void UpdateDrawFrame2(data *pData) {
       vPPU.y = std::max(vPPU.y - 10.f, MinPixelPerUnit);
       vPPU.z = std::max(vPPU.z - 10.f, MinPixelPerUnit);
 
-      pData->PixelsPerUnit = std::max(pData->PixelsPerUnit - 10.f, MinPixelPerUnit);
+      pData->PixelsPerUnit =
+          std::max(pData->PixelsPerUnit - 10.f, MinPixelPerUnit);
 
       InputChanged = true;
     } else if (KEY_UP == pData->Key) {
@@ -1078,7 +1079,8 @@ void UpdateDrawFrame2(data *pData) {
       vPPU.y = std::max(vPPU.y + 10.f, MinPixelPerUnit);
       vPPU.z = std::max(vPPU.z + 10.f, MinPixelPerUnit);
 
-      pData->PixelsPerUnit = std::max(pData->PixelsPerUnit + 10.f, MinPixelPerUnit);
+      pData->PixelsPerUnit =
+          std::max(pData->PixelsPerUnit + 10.f, MinPixelPerUnit);
 
       InputChanged = true;
     } else if (KEY_LEFT == pData->Key) {
@@ -1098,10 +1100,10 @@ void UpdateDrawFrame2(data *pData) {
   if (InputChanged) {
     pData->Time = 0.0;
     pData->vPixelPos.clear();
-    pData->vGridLines = vGridInPixels(pData->PixelsPerUnit, pData->MatPixel);
+    pData->vGridLines = vGridInPixels(pData->Hep);
     InitFourierSquareWave(*pData, pData->n);
 
-    pData->MatPixel = InitEng2PixelMatrix(
+    pData->Hep = InitEng2PixelMatrix(
         pData->vEngOffset, pData->vPixelsPerUnit,
         {pData->screenWidth / 2.f, pData->screenHeight / 2.f, 0.f, 0.f});
 
@@ -1134,12 +1136,11 @@ void UpdateDrawFrame2(data *pData) {
                140, 70, 20, BLUE);
   };
 
-  DrawPoint(pData->MatPixel, es::Point(0.f, 0.f, 0.f), pData->PixelsPerUnit,
-            true);
-  DrawPoint(pData->MatPixel, es::Point(1.f, 1.f, 0.f), pData->PixelsPerUnit);
-  DrawPoint(pData->MatPixel, es::Point(1.f, -1.f, 0.f), pData->PixelsPerUnit);
-  DrawPoint(pData->MatPixel, es::Point(-1.f, 1.f, 0.f), pData->PixelsPerUnit);
-  DrawPoint(pData->MatPixel, es::Point(-1.f, -1.f, 0.f), pData->PixelsPerUnit);
+  DrawPoint(pData->Hep, es::Point(0.f, 0.f, 0.f), pData->PixelsPerUnit, true);
+  DrawPoint(pData->Hep, es::Point(1.f, 1.f, 0.f), pData->PixelsPerUnit);
+  DrawPoint(pData->Hep, es::Point(1.f, -1.f, 0.f), pData->PixelsPerUnit);
+  DrawPoint(pData->Hep, es::Point(-1.f, 1.f, 0.f), pData->PixelsPerUnit);
+  DrawPoint(pData->Hep, es::Point(-1.f, -1.f, 0.f), pData->PixelsPerUnit);
 
   EndDrawing();
 }
