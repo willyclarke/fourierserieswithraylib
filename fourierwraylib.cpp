@@ -76,26 +76,25 @@ struct data {
   float X{};
   float Y{};
   float Time{};
-  float Fx{};               //!< Fourier calculated series value.
-  int n{1};                 //!< Fourier series number of terms.
-  float PixelsPerUnit{100}; //!< Meter 2 pixel conversion - multiplicator.
+  float Fx{}; //!< Fourier calculated series value.
+  int n{1};   //!< Fourier series number of terms.
   float dt{};
   float t{};
   std::vector<pixel_pos> vPixelPos{};
   std::vector<square_wave_elem> vSquareWaveElems{};
   std::vector<pixel_pos> vGridLines{};
 
-  Matrix Hep{}; //!< Homogenous matrix for conversion from enginnering space to
+  Matrix Hep{}; //!< Homogenous matrix for conversion from engineering space to
                 //!< pixelspace.
 
-  Vector4 vEngOffset{}; //!< Position of figure in enginnering space.
+  Vector4 vEngOffset{}; //!< Position of figure in engineering space.
   Vector4 vPixelsPerUnit{100.f, 100.f, 100.f, 0.f};
 };
 
 /**
- * es - enginnering support namespace
+ * es - engineering support namespace
  */
-namespace es // aka enginnering support
+namespace es // aka engineering support
 {
 /**
  * Identity matrix 4x4
@@ -442,7 +441,7 @@ auto Test3dCalucations() -> void {
 
   Matrix M{};
 
-  // Move from enginnering space to screen space
+  // Move from engineering space to screen space
   // i.e. The center of the screen will be at x=3,y=4
   M = es::InitTranslationInv({}, es::Point(3.f, 4.f, 0.f));
   {
@@ -565,7 +564,7 @@ auto Test3dCalucations() -> void {
  * Test changes from coordinate system to screen coordinates.
  */
 auto Test3dScreenCalculations() -> void {
-  // Given the enginnering input
+  // Given the engineering input
   auto const Pe = es::Point(0.f, 0.f, 0.f);
 
   // Compute the screen coordinates - aka Matrix Screen = Ms
@@ -609,16 +608,16 @@ auto Test3dScreenCalculations() -> void {
 }
 
 /**
- * Initialize the matrix to convert from enginnering basis to screen basis.
+ * Initialize the matrix to convert from engineering basis to screen basis.
  * The screen center is used as the reference point.
  *
- * @OrigoScreen - the X, Y, Z values in enginnering space at center of screen.
- * @PixelsPerUnit - The number of pixels per unit, i.e 100 pixels equals 1m.
+ * @OrigoScreen - the X, Y, Z values in engineering space at center of screen.
+ * @vPixelsPerUnit - The number of pixels per unit, i.e 100 pixels equals 1m.
  * @ScreenCenterInPixels - The coordinates for the centre of the screen in
  * pixels.
  */
 auto InitEng2PixelMatrix(Vector4 const &OrigoScreen,
-                         Vector4 const &PixelsPerUnit,
+                         Vector4 const &vPixelsPerUnit,
                          Vector4 const &ScreenPosInPixels) -> Matrix {
 
   // ---
@@ -627,17 +626,17 @@ auto InitEng2PixelMatrix(Vector4 const &OrigoScreen,
   constexpr float Flip = -1.f;
 
   // ---
-  // Create a Homogenous matrix that converts from enginnering unit to screen.
+  // Create a Homogenous matrix that converts from engineering unit to screen.
   // ---
   auto Hes = es::I();
-  Hes.m12 = ScreenPosInPixels.x + OrigoScreen.x * PixelsPerUnit.x;
-  Hes.m13 = ScreenPosInPixels.y + OrigoScreen.y * PixelsPerUnit.y;
-  Hes.m14 = ScreenPosInPixels.z + OrigoScreen.z * PixelsPerUnit.z;
+  Hes.m12 = ScreenPosInPixels.x + OrigoScreen.x * vPixelsPerUnit.x;
+  Hes.m13 = ScreenPosInPixels.y + OrigoScreen.y * vPixelsPerUnit.y;
+  Hes.m14 = ScreenPosInPixels.z + OrigoScreen.z * vPixelsPerUnit.z;
 
   // Flip and scale to pixel value.
-  Hes.m0 = Flip * PixelsPerUnit.x;
-  Hes.m5 = Flip * PixelsPerUnit.y;
-  Hes.m10 = Flip * PixelsPerUnit.z;
+  Hes.m0 = Flip * vPixelsPerUnit.x;
+  Hes.m5 = Flip * vPixelsPerUnit.y;
+  Hes.m10 = Flip * vPixelsPerUnit.z;
 
   return Hes;
 }
@@ -645,7 +644,7 @@ auto InitEng2PixelMatrix(Vector4 const &OrigoScreen,
 /*
  * Create lines and ticks for a grid in engineering units.
  */
-auto vGridInPixels(Matrix const &Hep, //!< Homogenous matrix from enginnering to
+auto vGridInPixels(Matrix const &Hep, //!< Homogenous matrix from engineering to
                                       //!< pixel position.
                    float GridXLowerLeft = -4.f, //!<
                    float GridYLowerLeft = -3.f, //!<
@@ -730,19 +729,22 @@ auto vGridInPixels(Matrix const &Hep, //!< Homogenous matrix from enginnering to
 };
 
 //------------------------------------------------------------------------------
-void Test2() {
+void TestHomogenousMatrix() {
   // float m0, m4, m8, m12;  // Matrix first row (4 components)
   // float m1, m5, m9, m13;  // Matrix second row (4 components)
   // float m2, m6, m10, m14; // Matrix third row (4 components)
   // float m3, m7, m11, m15; // Matrix fourth row (4 components)
   auto Hes = es::I();
   constexpr float Flip = -1.f;
-  constexpr float Eng2Pixel =
-      100; // Make 1 enginnering unit correspond to 100 pixels.
+
+  // Make 1 engineering unit correspond to 100 pixels.
+  constexpr float Eng2Pixel = 100;
+
   // Set translation:
   Hes.m12 = 1280 / 2.f;
   Hes.m13 = 1024 / 2.f;
 
+  // Some engineering test points.
   auto const Pe1 = es::Point(0.f, 0.f, 0.f);
   auto const Pe2 = es::Point(1.f, 0.f, 0.f);
   auto const Pe3 = es::Point(-1.f, 0.f, 0.f);
@@ -779,7 +781,7 @@ void Test2() {
 //----------------------------------------------------------------------------------
 int main() {
 
-  // Test2();
+  TestHomogenousMatrix();
   Test3dCalucations();
   Test3dScreenCalculations();
 
@@ -797,7 +799,7 @@ int main() {
   SetTargetFPS(60); // Set our game to run at 60 frames-per-second
 
   // ---
-  // NOTE: Move all points around by setting the enginnering offset which will
+  // NOTE: Move all points around by setting the engineering offset which will
   // be added to the offset of the screen position in pixels.
   // ---
   Data.vEngOffset = es::Point(0.f, 0.f, 0.f);
@@ -821,7 +823,7 @@ int main() {
       Data.t = GetTime();
     Data.Key = GetKeyPressed();
 
-    UpdateDrawFrame2(pData);
+    UpdateDrawFrame(pData);
   }
 #endif
 
@@ -831,6 +833,61 @@ int main() {
   //--------------------------------------------------------------------------------------
 
   return 0;
+}
+
+/**
+ * Keyboard input handling common to all the drawing routines.
+ */
+auto HandleKeyboardInput(data *pData) -> bool {
+  bool InputChanged{};
+
+  constexpr float MinPixelPerUnit = 50.f;
+
+  if (pData->Key) {
+    if (KEY_G == pData->Key) {
+      pData->ShowGrid = !pData->ShowGrid;
+      InputChanged = true;
+    } else if (KEY_DOWN == pData->Key) {
+
+      auto &vPPU = pData->vPixelsPerUnit;
+      vPPU.x = std::max(vPPU.x - 10.f, MinPixelPerUnit);
+      vPPU.y = std::max(vPPU.y - 10.f, MinPixelPerUnit);
+      vPPU.z = std::max(vPPU.z - 10.f, MinPixelPerUnit);
+
+      InputChanged = true;
+    } else if (KEY_UP == pData->Key) {
+
+      auto &vPPU = pData->vPixelsPerUnit;
+      vPPU.x = std::max(vPPU.x + 10.f, MinPixelPerUnit);
+      vPPU.y = std::max(vPPU.y + 10.f, MinPixelPerUnit);
+      vPPU.z = std::max(vPPU.z + 10.f, MinPixelPerUnit);
+
+      InputChanged = true;
+    } else if (KEY_LEFT == pData->Key) {
+      --pData->n;
+      InputChanged = true;
+    } else if (KEY_RIGHT == pData->Key) {
+      ++pData->n;
+      InputChanged = true;
+    } else if (KEY_SPACE == pData->Key) {
+      InputChanged = true;
+      pData->StopUpdate = !pData->StopUpdate;
+    }
+
+    pData->KeyPrv = pData->Key;
+  }
+
+  if (InputChanged) {
+    pData->Time = 0.0;
+    pData->vPixelPos.clear();
+    pData->vGridLines = vGridInPixels(pData->Hep);
+    InitFourierSquareWave(*pData, pData->n);
+
+    pData->Hep = InitEng2PixelMatrix(
+        pData->vEngOffset, pData->vPixelsPerUnit,
+        {pData->screenWidth / 2.f, pData->screenHeight / 2.f, 0.f, 0.f});
+  }
+  return InputChanged;
 }
 
 //----------------------------------------------------------------------------------
@@ -849,7 +906,7 @@ void UpdateDrawFrame(data *pData) {
   ClearBackground(RAYWHITE);
 
   DrawText(std::string("Use arrow keys. Zoom: " +
-                       std::to_string(pData->PixelsPerUnit))
+                       std::to_string(pData->vPixelsPerUnit.x))
                .c_str(),
            140, 10, 20, BLUE);
   DrawText(std::string("Num terms: " + std::to_string(pData->n) +
@@ -857,31 +914,7 @@ void UpdateDrawFrame(data *pData) {
                .c_str(),
            140, 40, 20, BLUE);
 
-  bool InputChanged{};
-
-  if (KEY_DOWN == pData->Key) {
-    pData->PixelsPerUnit -= 10.0;
-    InputChanged = true;
-  }
-  if (KEY_UP == pData->Key) {
-    pData->PixelsPerUnit += 10.0;
-    InputChanged = true;
-  }
-  if (KEY_LEFT == pData->Key) {
-    --pData->n;
-    InputChanged = true;
-  }
-  if (KEY_RIGHT == pData->Key) {
-    ++pData->n;
-    InputChanged = true;
-  }
-  if (KEY_SPACE == pData->Key) {
-    InputChanged = true;
-    pData->StopUpdate = !pData->StopUpdate;
-  }
-
-  if (pData->Key)
-    pData->KeyPrv = pData->Key;
+  bool const InputChanged = HandleKeyboardInput(pData);
 
   auto const Frequency = 1.0; /// pData->dt;
   auto const Omegat = M_2_PI * Frequency * pData->t;
@@ -893,7 +926,7 @@ void UpdateDrawFrame(data *pData) {
   // NOTE: The circle defining the base of the Fourier series.
   //       Input here is wt (that is omega * t, which is 2*pi*f*t)
   // ---
-  float constexpr C0PosX = -5.f;
+  float constexpr C0PosX = -9.f;
   float constexpr C0PosY = 0.f;
   float const C0Radius = pData->vSquareWaveElems.at(0).Amplitude;
 
@@ -920,23 +953,24 @@ void UpdateDrawFrame(data *pData) {
     AccY += E.Yn;
 
     if (!Idx) {
-      auto const PixelPos =
-          Conv2Pix(C0PosX, C0PosY, pData->PixelsPerUnit, pData->PixelsPerUnit);
-      DrawCircleLines(PixelPos.X, PixelPos.Y, Radius * pData->PixelsPerUnit,
+      AccX = 0.f;
+      auto const PixelPos = Conv2Pix(C0PosX, C0PosY, pData->vPixelsPerUnit.y,
+                                     pData->vPixelsPerUnit.y);
+      DrawCircleLines(PixelPos.X, PixelPos.Y, Radius * pData->vPixelsPerUnit.y,
                       Fade(BLUE, 0.3f));
     } else {
       auto const FourierTerm =
-          Conv2Pix(C0PosX + AccX, C0PosY + AccY, pData->PixelsPerUnit,
-                   pData->PixelsPerUnit);
+          Conv2Pix(C0PosX + AccX, C0PosY + AccY, pData->vPixelsPerUnit.y,
+                   pData->vPixelsPerUnit.y);
       DrawCircleLines(FourierTerm.X, FourierTerm.Y,
-                      Radius * pData->PixelsPerUnit, Fade(BLUE, 0.3f));
+                      Radius * pData->vPixelsPerUnit.y, Fade(BLUE, 0.3f));
 
       auto const CurrCircleLine =
           Conv2Pix(C0PosX + AccX + Radius * std::sin(E.Theta),
                    C0PosY + AccY + Radius * std::cos(E.Theta),
-                   pData->PixelsPerUnit, pData->PixelsPerUnit);
+                   pData->vPixelsPerUnit.y, pData->vPixelsPerUnit.y);
       DrawLine(CurrCircleLine.X, CurrCircleLine.Y, FourierTerm.X, FourierTerm.Y,
-               Fade(BLACK, 1.0f));
+               Fade(ORANGE, 1.0f));
     }
   }
 
@@ -944,15 +978,16 @@ void UpdateDrawFrame(data *pData) {
   // NOTE: Draw the connection line from the circle to the end of the plot.
   // ---
   auto const IndLinePos1 =
-      Conv2Pix(AccX, AccY, pData->PixelsPerUnit, pData->PixelsPerUnit);
+      Conv2Pix(AccX, AccY, pData->vPixelsPerUnit.y, pData->vPixelsPerUnit.y);
   auto const IndLinePos2 =
       Conv2Pix(C0PosX + C0Radius * 1.2f + pData->Time, AccY,
-               pData->PixelsPerUnit, pData->PixelsPerUnit);
+               pData->vPixelsPerUnit.y, pData->vPixelsPerUnit.y);
 
-  pData->Time += 1.0 / pData->PixelsPerUnit;
+  pData->Time += 1.0 / pData->vPixelsPerUnit.y;
 
-  if (InputChanged || (pData->Time > (GetScreenWidth() - IndLinePos1.X) /
-                                         pData->PixelsPerUnit)) {
+  if (InputChanged ||
+      (pData->Time >
+       (GetScreenWidth() - 0.95f * IndLinePos1.X) / pData->vPixelsPerUnit.y)) {
     pData->Time = 0.0;
     pData->vPixelPos.clear();
     pData->vGridLines = vGridInPixels(pData->Hep);
@@ -960,10 +995,11 @@ void UpdateDrawFrame(data *pData) {
     return;
   }
 
-  auto const DrawStartPx = Conv2Pix(C0PosX + AccX, C0PosY + AccY,
-                                    pData->PixelsPerUnit, pData->PixelsPerUnit);
-  auto const C0PosPx =
-      Conv2Pix(C0PosX, C0PosY, pData->PixelsPerUnit, pData->PixelsPerUnit);
+  auto const DrawStartPx =
+      Conv2Pix(C0PosX + AccX, C0PosY + AccY, pData->vPixelsPerUnit.y,
+               pData->vPixelsPerUnit.y);
+  auto const C0PosPx = Conv2Pix(C0PosX, C0PosY, pData->vPixelsPerUnit.y,
+                                pData->vPixelsPerUnit.y);
 
   DrawLine(C0PosPx.X, C0PosPx.Y, DrawStartPx.X, DrawStartPx.Y,
            Fade(BLACK, 1.0f));
@@ -1001,7 +1037,7 @@ void UpdateDrawFrame2(data *pData) {
   ClearBackground(RAYWHITE);
 
   DrawText(std::string("Use arrow keys. Zoom: " +
-                       std::to_string(pData->PixelsPerUnit))
+                       std::to_string(pData->vPixelsPerUnit.x))
                .c_str(),
            140, 10, 20, BLUE);
   DrawText(std::string("Num terms: " + std::to_string(pData->n) +
@@ -1024,9 +1060,6 @@ void UpdateDrawFrame2(data *pData) {
       vPPU.y = std::max(vPPU.y - 10.f, MinPixelPerUnit);
       vPPU.z = std::max(vPPU.z - 10.f, MinPixelPerUnit);
 
-      pData->PixelsPerUnit =
-          std::max(pData->PixelsPerUnit - 10.f, MinPixelPerUnit);
-
       InputChanged = true;
     } else if (KEY_UP == pData->Key) {
 
@@ -1034,9 +1067,6 @@ void UpdateDrawFrame2(data *pData) {
       vPPU.x = std::max(vPPU.x + 10.f, MinPixelPerUnit);
       vPPU.y = std::max(vPPU.y + 10.f, MinPixelPerUnit);
       vPPU.z = std::max(vPPU.z + 10.f, MinPixelPerUnit);
-
-      pData->PixelsPerUnit =
-          std::max(pData->PixelsPerUnit + 10.f, MinPixelPerUnit);
 
       InputChanged = true;
     } else if (KEY_LEFT == pData->Key) {
@@ -1077,12 +1107,12 @@ void UpdateDrawFrame2(data *pData) {
   // ---
   // NOTE: Lamda to draw a point.
   // ---
-  auto DrawPoint = [](Matrix const &MatPixel, Vector4 const &P, float m2Pixel,
-                      bool Print = false) -> void {
+  auto DrawPoint = [](Matrix const &MatPixel, Vector4 const &P,
+                      Vector4 const &m2Pixel, bool Print = false) -> void {
     auto CurvePoint = MatPixel * P;
     DrawPixel(CurvePoint.x, CurvePoint.y, RED);
     constexpr float Radius = 0.1f;
-    DrawCircleLines(CurvePoint.x, CurvePoint.y, Radius * m2Pixel,
+    DrawCircleLines(CurvePoint.x, CurvePoint.y, Radius * m2Pixel.x,
                     Fade(BLUE, 0.3f));
     DrawLine(CurvePoint.x, CurvePoint.y, 0, 0, BLUE);
     if (Print)
@@ -1092,11 +1122,11 @@ void UpdateDrawFrame2(data *pData) {
                140, 70, 20, BLUE);
   };
 
-  DrawPoint(pData->Hep, es::Point(0.f, 0.f, 0.f), pData->PixelsPerUnit, true);
-  DrawPoint(pData->Hep, es::Point(1.f, 1.f, 0.f), pData->PixelsPerUnit);
-  DrawPoint(pData->Hep, es::Point(1.f, -1.f, 0.f), pData->PixelsPerUnit);
-  DrawPoint(pData->Hep, es::Point(-1.f, 1.f, 0.f), pData->PixelsPerUnit);
-  DrawPoint(pData->Hep, es::Point(-1.f, -1.f, 0.f), pData->PixelsPerUnit);
+  DrawPoint(pData->Hep, es::Point(0.f, 0.f, 0.f), pData->vPixelsPerUnit, true);
+  DrawPoint(pData->Hep, es::Point(1.f, 1.f, 0.f), pData->vPixelsPerUnit);
+  DrawPoint(pData->Hep, es::Point(1.f, -1.f, 0.f), pData->vPixelsPerUnit);
+  DrawPoint(pData->Hep, es::Point(-1.f, 1.f, 0.f), pData->vPixelsPerUnit);
+  DrawPoint(pData->Hep, es::Point(-1.f, -1.f, 0.f), pData->vPixelsPerUnit);
 
   EndDrawing();
 }
