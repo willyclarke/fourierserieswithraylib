@@ -9,6 +9,7 @@
  ********************************************************************************************/
 
 #include "engsupport.hpp"
+#include "raylib.h"
 #include <iomanip>
 
 /**
@@ -99,8 +100,21 @@ Vector4 Mul(Matrix const &M, Vector4 const &V) {
 
 /**
  */
+Vector4 Add(Vector4 const &V1, Vector4 const &V2) {
+  return Vector4{V1.x + V2.x, V1.y + V2.y, V1.z + V2.z, V1.w + V2.w};
+}
+
+/**
+ * Dot product.
+ */
 float Mul(Vector4 const &V1, Vector4 const &V2) {
   return V1.x * V2.x + V1.y * V2.y + V1.z * V2.z + V1.w * V2.w;
+}
+
+/**
+ */
+Vector4 Sub(Vector4 const &V1, Vector4 const &V2) {
+  return Vector4{V1.x - V2.x, V1.y - V2.y, V1.z - V2.z, V1.w - V2.w};
 }
 
 /**
@@ -198,8 +212,14 @@ Matrix operator+(Matrix const &M1, Matrix const &M2) { return es::Add(M1, M2); }
 bool operator==(Matrix const &M1, Matrix const &M2) { return es::Eq(M1, M2); }
 bool operator!=(Matrix const &M1, Matrix const &M2) { return !(M1 == M2); }
 Vector4 operator*(Matrix const &M, Vector4 const &V) { return es::Mul(M, V); }
+Vector4 operator+(Vector4 const &V1, Vector4 const &V2) {
+  return es::Add(V1, V2);
+}
 float operator*(Vector4 const &V1, Vector4 const &V2) {
   return es::Mul(V1, V2);
+}
+Vector4 operator-(Vector4 const &V1, Vector4 const &V2) {
+  return es::Sub(V1, V2);
 }
 
 /**

@@ -83,6 +83,8 @@ bool operator==(Matrix const &M1, Matrix const &M2);
 bool operator!=(Matrix const &M1, Matrix const &M2);
 Vector4 operator*(Matrix const &M, Vector4 const &V);
 float operator*(Vector4 const &V1, Vector4 const &V2);
+Vector4 operator+(Vector4 const &V1, Vector4 const &V2);
+Vector4 operator-(Vector4 const &V1, Vector4 const &V2);
 
 std::ostream &operator<<(std::ostream &stream, const Vector4 &T);
 std::ostream &operator<<(std::ostream &stream, const Matrix &M);

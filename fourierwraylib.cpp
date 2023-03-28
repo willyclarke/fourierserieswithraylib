@@ -374,6 +374,7 @@ auto InitEng2PixelMatrix(Vector4 const &OrigoScreen,
   // Flip because pixel coord increases when moving down.
   // ---
   constexpr float Flip = -1.f;
+  constexpr float NoFlip = 1.f;
 
   // ---
   // Create a Homogenous matrix that converts from engineering unit to screen.
@@ -384,9 +385,9 @@ auto InitEng2PixelMatrix(Vector4 const &OrigoScreen,
   Hes.m14 = ScreenPosInPixels.z + OrigoScreen.z * vPixelsPerUnit.z;
 
   // Flip and scale to pixel value.
-  Hes.m0 = Flip * vPixelsPerUnit.x;
+  Hes.m0 = NoFlip * vPixelsPerUnit.x;
   Hes.m5 = Flip * vPixelsPerUnit.y;
-  Hes.m10 = Flip * vPixelsPerUnit.z;
+  Hes.m10 = NoFlip * vPixelsPerUnit.z;
 
   return Hes;
 }
@@ -553,7 +554,7 @@ int main() {
   // be added to the offset of the screen position in pixels.
   // ---
   Data.vEngOffset = es::Point(0.f, 0.f, 0.f);
-  Data.vPixelsPerUnit = es::Point(100.f, 50.f, 0.f);
+  Data.vPixelsPerUnit = es::Point(100.f, 100.f, 0.f);
 
   Data.Hep = InitEng2PixelMatrix(
       Data.vEngOffset, Data.vPixelsPerUnit,
@@ -871,6 +872,69 @@ void UpdateDrawFrameFourier(data *pData) {
       auto const &Elem1 = pData->vGridLines[Idx + 1];
       DrawLine(Elem0.X, Elem0.Y, Elem1.X, Elem1.Y, Fade(VIOLET, 1.0f));
     }
+  }
+
+  // ---
+  // NOTE: Lamda to draw a point.
+  // ---
+  auto ldaDrawPoint = [](Matrix const &Hep, Vector4 const &P,
+                         Vector4 const &m2Pixel, bool Print = false) -> void {
+    auto CurvePoint = Hep * P;
+    DrawPixel(CurvePoint.x, CurvePoint.y, RED);
+    constexpr float Radius = 0.1f;
+    DrawCircleLines(CurvePoint.x, CurvePoint.y, Radius * m2Pixel.x,
+                    Fade(BLUE, 0.3f));
+    DrawLine(CurvePoint.x, CurvePoint.y, 0, 0, BLUE);
+    if (Print)
+      DrawText(std::string("CurvePoint x/y: " + std::to_string(CurvePoint.x) +
+                           " / " + std::to_string(CurvePoint.y))
+                   .c_str(),
+               140, 70, 20, BLUE);
+  };
+
+  auto ldaDrawCircle = [](Matrix const &Hep, Vector4 const &Centre,
+                          float Radius, Color Col = BLUE) -> void {
+    auto CurvePoint = Hep * Centre;
+    DrawCircleLines(CurvePoint.x, CurvePoint.y, Radius * Hep.m5,
+                    Fade(Col, 0.3f));
+  };
+
+  auto ldaDrawLine = [](Matrix const &Hep, Vector4 const &From,
+                        Vector4 const &To, Color Col = BLUE) -> void {
+    auto F = Hep * From;
+    auto T = Hep * To;
+    DrawLine(F.x, F.y, T.x, T.y, BLUE);
+  };
+
+  // ldaDrawPoint(pData->Hep, es::Point(0.f, 0.f, 0.f), pData->vPixelsPerUnit,
+  // true); ldaDrawPoint(pData->Hep, es::Point(1.f, 1.f, 0.f),
+  // pData->vPixelsPerUnit); ldaDrawPoint(pData->Hep, es::Point(1.f, -1.f, 0.f),
+  // pData->vPixelsPerUnit); ldaDrawPoint(pData->Hep, es::Point(-1.f, 1.f, 0.f),
+  // pData->vPixelsPerUnit); ldaDrawPoint(pData->Hep, es::Point(-1.f, -1.f,
+  // 0.f), pData->vPixelsPerUnit);
+
+  auto const Frequency = 1.0; /// pData->dt;
+  auto const Omegat = M_2_PI * Frequency * pData->t;
+  auto const Radius = 4.f / M_PI;
+  auto Centre = es::Point(-5.f, 0.f, 0.f);
+
+  auto Ft = Centre + es::Vector(Radius * std::cosf(Omegat),
+                                Radius * std::sinf(Omegat), 0.f);
+
+  ldaDrawCircle(pData->Hep, Centre, Radius);
+
+  // ---
+  // Create the Fourier series.
+  // ---
+  auto Ftp = Ft;
+  for (int Idx = 1; Idx < pData->n; ++Idx) {
+    auto nthTerm = 1.f + Idx * 2.f;
+    auto Ftn =
+        Ftp + es::Vector(Radius / nthTerm * std::cosf(nthTerm * Omegat),
+                         Radius / nthTerm * std::sinf(nthTerm * Omegat), 0.f);
+    ldaDrawLine(pData->Hep, Ftp, Ftn);
+    ldaDrawCircle(pData->Hep, Ftn, Radius / nthTerm);
+    Ftp = Ftn;
   }
 
   EndDrawing();
