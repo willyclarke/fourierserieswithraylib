@@ -114,8 +114,9 @@ Vector2 ComputeNext(Vector2 const &Current, Vector2 const &Constant) {
 //
 
 //----------------------------------------------------------------------------------
-void UpdateDrawFrame(data *Data);  // Update and Draw one frame
-void UpdateDrawFrame2(data *Data); // Update and Draw one frame
+void UpdateDrawFrameFourier(data *Data); // Update and Draw one frame
+void UpdateDrawFrame(data *Data);        // Update and Draw one frame
+void UpdateDrawFrame2(data *Data);       // Update and Draw one frame
 
 //------------------------------------------------------------------------------
 // @ desc Compute the amplitude of a single term of the Fourier based square
@@ -572,7 +573,8 @@ int main() {
       Data.t = GetTime();
     Data.Key = GetKeyPressed();
 
-    UpdateDrawFrame(pData);
+    UpdateDrawFrameFourier(pData);
+    // UpdateDrawFrame(pData);
   }
 #endif
 
@@ -794,43 +796,9 @@ void UpdateDrawFrame2(data *pData) {
                .c_str(),
            140, 40, 20, BLUE);
 
-  bool InputChanged{};
+  bool const InputChanged = HandleKeyboardInput(pData);
 
   constexpr float MinPixelPerUnit = 50.f;
-
-  if (pData->Key) {
-    if (KEY_G == pData->Key) {
-      pData->ShowGrid = !pData->ShowGrid;
-      InputChanged = true;
-    } else if (KEY_DOWN == pData->Key) {
-
-      auto &vPPU = pData->vPixelsPerUnit;
-      vPPU.x = std::max(vPPU.x - 10.f, MinPixelPerUnit);
-      vPPU.y = std::max(vPPU.y - 10.f, MinPixelPerUnit);
-      vPPU.z = std::max(vPPU.z - 10.f, MinPixelPerUnit);
-
-      InputChanged = true;
-    } else if (KEY_UP == pData->Key) {
-
-      auto &vPPU = pData->vPixelsPerUnit;
-      vPPU.x = std::max(vPPU.x + 10.f, MinPixelPerUnit);
-      vPPU.y = std::max(vPPU.y + 10.f, MinPixelPerUnit);
-      vPPU.z = std::max(vPPU.z + 10.f, MinPixelPerUnit);
-
-      InputChanged = true;
-    } else if (KEY_LEFT == pData->Key) {
-      --pData->n;
-      InputChanged = true;
-    } else if (KEY_RIGHT == pData->Key) {
-      ++pData->n;
-      InputChanged = true;
-    } else if (KEY_SPACE == pData->Key) {
-      InputChanged = true;
-      pData->StopUpdate = !pData->StopUpdate;
-    }
-
-    pData->KeyPrv = pData->Key;
-  }
 
   if (InputChanged) {
     pData->Time = 0.0;
@@ -856,9 +824,9 @@ void UpdateDrawFrame2(data *pData) {
   // ---
   // NOTE: Lamda to draw a point.
   // ---
-  auto DrawPoint = [](Matrix const &MatPixel, Vector4 const &P,
+  auto DrawPoint = [](Matrix const &Hep, Vector4 const &P,
                       Vector4 const &m2Pixel, bool Print = false) -> void {
-    auto CurvePoint = MatPixel * P;
+    auto CurvePoint = Hep * P;
     DrawPixel(CurvePoint.x, CurvePoint.y, RED);
     constexpr float Radius = 0.1f;
     DrawCircleLines(CurvePoint.x, CurvePoint.y, Radius * m2Pixel.x,
@@ -876,6 +844,34 @@ void UpdateDrawFrame2(data *pData) {
   DrawPoint(pData->Hep, es::Point(1.f, -1.f, 0.f), pData->vPixelsPerUnit);
   DrawPoint(pData->Hep, es::Point(-1.f, 1.f, 0.f), pData->vPixelsPerUnit);
   DrawPoint(pData->Hep, es::Point(-1.f, -1.f, 0.f), pData->vPixelsPerUnit);
+
+  EndDrawing();
+}
+
+/**
+ */
+void UpdateDrawFrameFourier(data *pData) {
+  BeginDrawing();
+  ClearBackground(RAYWHITE);
+
+  DrawText(std::string("Use arrow keys. Zoom: " +
+                       std::to_string(pData->vPixelsPerUnit.x))
+               .c_str(),
+           140, 10, 20, BLUE);
+  DrawText(std::string("Num terms: " + std::to_string(pData->n) +
+                       ". Key:" + std::to_string(pData->KeyPrv))
+               .c_str(),
+           140, 40, 20, BLUE);
+
+  bool const InputChanged = HandleKeyboardInput(pData);
+
+  if (pData->ShowGrid) {
+    for (size_t Idx = 0; Idx < pData->vGridLines.size(); Idx += 2) {
+      auto const &Elem0 = pData->vGridLines[Idx];
+      auto const &Elem1 = pData->vGridLines[Idx + 1];
+      DrawLine(Elem0.X, Elem0.Y, Elem1.X, Elem1.Y, Fade(VIOLET, 1.0f));
+    }
+  }
 
   EndDrawing();
 }
