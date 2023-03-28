@@ -83,6 +83,7 @@ struct data {
   float t{};
   std::vector<pixel_pos> vPixelPos{};
   std::vector<square_wave_elem> vSquareWaveElems{};
+  std::vector<Vector4> vTrendPoints{};
   std::vector<pixel_pos> vGridLines{};
 
   Matrix Hep{}; //!< Homogenous matrix for conversion from engineering space to
@@ -537,6 +538,8 @@ int main() {
   Test3dScreenCalculations();
 
   data Data{};
+  Data.vTrendPoints.reserve(size_t(Data.screenWidth));
+
   auto pData = &Data;
 
   // Initialization
@@ -860,7 +863,8 @@ void UpdateDrawFrameFourier(data *pData) {
                .c_str(),
            140, 10, 20, BLUE);
   DrawText(std::string("Num terms: " + std::to_string(pData->n) +
-                       ". Key:" + std::to_string(pData->KeyPrv))
+                       ". Key:" + std::to_string(pData->KeyPrv) +
+                       ". Time:" + std::to_string(pData->Time))
                .c_str(),
            140, 40, 20, BLUE);
 
@@ -881,15 +885,16 @@ void UpdateDrawFrameFourier(data *pData) {
                          Vector4 const &m2Pixel, bool Print = false) -> void {
     auto CurvePoint = Hep * P;
     DrawPixel(CurvePoint.x, CurvePoint.y, RED);
-    constexpr float Radius = 0.1f;
+    constexpr float Radius = 0.01f;
     DrawCircleLines(CurvePoint.x, CurvePoint.y, Radius * m2Pixel.x,
                     Fade(BLUE, 0.3f));
-    DrawLine(CurvePoint.x, CurvePoint.y, 0, 0, BLUE);
-    if (Print)
+    if (Print) {
+      DrawLine(CurvePoint.x, CurvePoint.y, 0, 0, BLUE);
       DrawText(std::string("CurvePoint x/y: " + std::to_string(CurvePoint.x) +
                            " / " + std::to_string(CurvePoint.y))
                    .c_str(),
                140, 70, 20, BLUE);
+    }
   };
 
   auto ldaDrawCircle = [](Matrix const &Hep, Vector4 const &Centre,
@@ -906,14 +911,7 @@ void UpdateDrawFrameFourier(data *pData) {
     DrawLine(F.x, F.y, T.x, T.y, BLUE);
   };
 
-  // ldaDrawPoint(pData->Hep, es::Point(0.f, 0.f, 0.f), pData->vPixelsPerUnit,
-  // true); ldaDrawPoint(pData->Hep, es::Point(1.f, 1.f, 0.f),
-  // pData->vPixelsPerUnit); ldaDrawPoint(pData->Hep, es::Point(1.f, -1.f, 0.f),
-  // pData->vPixelsPerUnit); ldaDrawPoint(pData->Hep, es::Point(-1.f, 1.f, 0.f),
-  // pData->vPixelsPerUnit); ldaDrawPoint(pData->Hep, es::Point(-1.f, -1.f,
-  // 0.f), pData->vPixelsPerUnit);
-
-  auto const Frequency = 1.0; /// pData->dt;
+  auto const Frequency = 2.0;
   auto const Omegat = M_2_PI * Frequency * pData->t;
   auto const Radius = 4.f / M_PI;
   auto Centre = es::Point(-5.f, 0.f, 0.f);
@@ -936,6 +934,27 @@ void UpdateDrawFrameFourier(data *pData) {
     ldaDrawCircle(pData->Hep, Ftn, Radius / nthTerm);
     Ftp = Ftn;
   }
+
+  auto GridStart = es::Point(0.f, 0.f, 0.f);
+  pData->Time += pData->dt;
+
+  // Reset time - based on knowing that the default grid settings are from -4 to
+  // +4. FIXME.
+  if (pData->Time > 4.f) {
+    pData->Time = -4.f;
+    pData->vTrendPoints.clear();
+  }
+
+  auto AnimationPoint = GridStart + es::Vector(pData->Time, Ftp.y, 0.f);
+
+  // Draw the actual trend
+  pData->vTrendPoints.push_back(AnimationPoint);
+  for (auto E : pData->vTrendPoints) {
+    ldaDrawPoint(pData->Hep, E, {pData->Hep.m0, pData->Hep.m5, 0.f, 0.f});
+  }
+
+  // Draw the connecting line
+  ldaDrawLine(pData->Hep, Ftp, AnimationPoint);
 
   EndDrawing();
 }
