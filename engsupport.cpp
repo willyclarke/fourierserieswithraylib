@@ -205,6 +205,226 @@ Matrix Mul(Matrix const &M1, Matrix const &M2) {
   return Result;
 }
 
+//------------------------------------------------------------------------------
+void TestHomogenousMatrix() {
+  // float m0, m4, m8, m12;  // Matrix first row (4 components)
+  // float m1, m5, m9, m13;  // Matrix second row (4 components)
+  // float m2, m6, m10, m14; // Matrix third row (4 components)
+  // float m3, m7, m11, m15; // Matrix fourth row (4 components)
+  auto Hes = es::I();
+  constexpr float Flip = -1.f;
+
+  // Make 1 engineering unit correspond to 100 pixels.
+  constexpr float Eng2Pixel = 100;
+
+  // Set translation:
+  Hes.m12 = 1280 / 2.f;
+  Hes.m13 = 1024 / 2.f;
+
+  // Some engineering test points.
+  auto const Pe1 = es::Point(0.f, 0.f, 0.f);
+  auto const Pe2 = es::Point(1.f, 0.f, 0.f);
+  auto const Pe3 = es::Point(-1.f, 0.f, 0.f);
+  auto const Ps = Hes * Pe1;
+
+  std::cout << Hes << std::endl;
+  std::cout << Ps << std::endl;
+
+  // Flip and scale to pixel value.
+  Hes.m0 = Flip * Eng2Pixel;
+  Hes.m5 = Flip * Eng2Pixel;
+  Hes.m10 = Flip * Eng2Pixel;
+  std::cout << "Eng point " << Pe1 << " moves to screen coord " << Hes * Pe1
+            << std::endl;
+  std::cout << "Eng point " << Pe2 << " moves to screen coord " << Hes * Pe2
+            << std::endl;
+  std::cout << "Eng point " << Pe3 << " moves to screen coord " << Hes * Pe3
+            << std::endl;
+
+  // Screen translation
+  Matrix Hst{};
+  Hst.m12 = 100.f;
+  Hst.m13 = 100.f;
+  auto H = Hes + Hst;
+  std::cout << "Eng point " << Pe1 << " moves to screen coord " << H * Pe1
+            << std::endl;
+  std::cout << "Eng point " << Pe2 << " moves to screen coord " << H * Pe2
+            << std::endl;
+  std::cout << "Eng point " << Pe3 << " moves to screen coord " << H * Pe3
+            << std::endl;
+}
+
+/**
+ */
+auto Test3dCalucations() -> void {
+
+  Matrix M{};
+
+  // Move from engineering space to screen space
+  // i.e. The center of the screen will be at x=3,y=4
+  M = es::InitTranslationInv({}, es::Point(3.f, 4.f, 0.f));
+  {
+    Vector4 const V = M * Vector4{0.f, 0.f, 0.f, 1.f};
+    // Expected output is -3, -4
+    if (V.x != -3.f || V.y != -4.f)
+      std::cerr << "Failed to compute screen coordinates. Line:" << __LINE__
+                << std::endl;
+    //
+  }
+  {
+    Vector4 const V = M * es::Point(3.f, 0.f, 0.f);
+    // Expected output is 0, -4
+    if (V.x != 0.f || V.y != -4.f) {
+      std::cerr << "Failed to compute screen coordinates. Line:" << __LINE__
+                << std::endl;
+      std::cerr << M << std::endl;
+      std::cerr << V << std::endl;
+    }
+  }
+
+  M = es::InitScaling({}, es::Point(2.f, 3.f, 4.f));
+  std::cout << M << std::endl;
+
+  // NOTE: Scaling applies to vectors and points.
+  Vector4 const Po = M * Vector4{-4.f, 6.f, 8.f, 1.f};
+  if (Po.x != -8.f || Po.y != 18.f || Po.z != 32.f)
+    std::cerr << "Failed to compute scaling. Line:" << __LINE__ << std::endl;
+
+  Vector4 const Vector = M * Vector4{-4.f, 6.f, 8.f, 0.f};
+  if (Vector.x != -8.f || Vector.y != 18.f || Vector.z != 32.f) {
+    std::cerr << "Failed to compute scaling. Line:" << __LINE__ << std::endl;
+
+    std::cout << Po << std::endl;
+    std::cout << Vector << std::endl;
+  }
+
+  // ---
+  // Test Point multiplication with matrix.
+  // ---
+  {
+    Matrix M2{
+        1.f, 2.f, 3.f, 4.f, //<!
+        2.f, 4.f, 4.f, 2.f, //<!
+        8.f, 6.f, 4.f, 1.f, //<!
+        0.f, 0.f, 0.f, 1.f  //!<
+    };
+
+    Vector4 const P = es::Point(1.f, 2.f, 3.f);
+    auto const Result = es::Mul(M2, P);
+    if (Result.x != 18.f || Result.y != 24.f || Result.z != 33.f ||
+        Result.w != 1.f) {
+
+      std::cerr << "Failed to compute Matrix multiplicator, Line: " << __LINE__
+                << std::endl;
+
+      std::cout << M2 << std::endl;
+      std::cout << Result << std::endl;
+    }
+  }
+
+  // ---
+  // Test Point multiplication with matrix using operators.
+  // ---
+  {
+    Matrix M2{
+        1.f, 2.f, 3.f, 4.f, //<!
+        2.f, 4.f, 4.f, 2.f, //<!
+        8.f, 6.f, 4.f, 1.f, //<!
+        0.f, 0.f, 0.f, 1.f  //!<
+    };
+
+    Vector4 const P = es::Point(1.f, 2.f, 3.f);
+    auto const Result = M2 * P;
+    if (Result.x != 18.f || Result.y != 24.f || Result.z != 33.f ||
+        Result.w != 1.f) {
+
+      std::cerr << "Failed to compute Matrix multiplicator, Line: " << __LINE__
+                << std::endl;
+
+      std::cout << M2 << std::endl;
+      std::cout << Result << std::endl;
+    }
+  }
+
+  // ---
+  // Test Matrix multiplication with Matrix
+  // ---
+  {
+    Matrix A{
+        1.f, 2.f, 3.f, 4.f, //!<
+        5.f, 6.f, 7.f, 8.f, //!<
+        9.f, 8.f, 7.f, 6.f, //!<
+        5.f, 4.f, 3.f, 2.f  //!<
+    };
+    Matrix B{
+        -2.f, 1.f, 2.f, 3.f,  //!<
+        3.f,  2.f, 1.f, -1.f, //!<
+        4.f,  3.f, 6.f, 5.f,  //!<
+        1.f,  2.f, 7.f, 8.f   //!<
+    };
+    Matrix Expect{
+        20.f, 22.f, 50.f,  48.f,  //!<
+        44.f, 54.f, 114.f, 108.f, //!<
+        40.f, 58.f, 110.f, 102.f, //!<
+        16.f, 26.f, 46.f,  42.f   //!<
+    };
+
+    auto const M = A * B;
+    if (M != Expect) {
+      std::cerr << "Matrix multiplication failed. Line: " << __LINE__
+                << std::endl;
+      std::cerr << "Calculated Matrix:" << M << std::endl;
+      std::cerr << "Expected Matrix:" << Expect << std::endl;
+    }
+  }
+}
+
+/**
+ * Test changes from coordinate system to screen coordinates.
+ */
+auto Test3dScreenCalculations() -> void {
+  // Given the engineering input
+  auto const Pe = es::Point(0.f, 0.f, 0.f);
+
+  // Compute the screen coordinates - aka Matrix Screen = Ms
+  auto const Ms = es::InitTranslationInv({}, es::Point(0.f, 0.f, 0.f));
+  auto const Ps = Ms * Pe;
+
+  std::cout << "Ms : " << Ms << std::endl;
+  std::cout << "Pe :" << Pe << std::endl;
+  std::cout << "Ps :" << Ps << std::endl;
+
+  // Compute the scaling into pixel space - aka Matrix Pixel Scale = Mps
+  // That gives the Pixel Point Pp.
+  auto const Mps = es::InitScaling({}, es::Point(100.f, 100.f, 100.f));
+  auto const Pps = Mps * Ps;
+
+  std::cout << "Mps: " << Mps << std::endl;
+  std::cout << "Pps:" << Pps << std::endl;
+
+  // Compute the translation onto the screen based on 0,0 beeing top left of
+  // screen
+  // Matrix Translation - aka Mpt
+  auto const Mpt =
+      es::InitTranslationInv({}, es::Point(-1280.f / 2.f, -1024.f / 2.f, 0.f));
+  std::cout << "Mpt:" << Mpt << std::endl;
+
+  {
+    auto const Pp = Mpt * Pps;
+    std::cout << "Pp :" << Pp << std::endl;
+  }
+
+  // ---
+  // Combine all the matrixes into one by multiplication.
+  // ---
+  {
+    auto const M = Mpt * Mps * Ms;
+    auto const PixelPos = Mpt * Pps;
+    std::cout << "Resulting Matrix:" << M << std::endl;
+    std::cout << "Pixel xositi :" << PixelPos << std::endl;
+    std::cout << "Pixel cositi :" << M * Pe << std::endl;
+  }
+}
 }; // namespace es
 
 Matrix operator*(Matrix const &M1, Matrix const &M2) { return es::Mul(M1, M2); }

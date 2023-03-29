@@ -18,6 +18,10 @@
  */
 namespace es // aka engineering support
 {
+void TestHomogenousMatrix();
+auto Test3dCalucations() -> void;
+auto Test3dScreenCalculations() -> void;
+
 /**
  * Identity matrix 4x4
  */
