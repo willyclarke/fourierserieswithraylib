@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.11) # FetchContent is available in 3.11+
+cmake_minimum_required(VERSION 3.25) # FetchContent seems to work with 3.25
 project(fourierwraylib)
 
 # Generate compile_commands.json

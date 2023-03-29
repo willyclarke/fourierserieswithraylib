@@ -27,6 +27,7 @@ To compile the example, use one of the following dependending on your build targ
 Use the following to build for desktop:
 
 ``` bash
+rm -rf build
 cmake -B build
 cmake --build build
 ```
@@ -40,21 +41,26 @@ cmake --build build
 ## Dependencies
 
 * Gcc/G++
+* cmake
 * Raylib - gets pulled down with cmake's Fetchcontent.
 * On Linux some X-dev libraries are needed. CMake will complain and you need to install the missing libraries.
-** For Ubuntu 20.04 the following apt-packages are needed:
 
+** For Ubuntu 20.04 the following apt-packages are needed:
 ```bash
-sudo apt install libxrandr-dev
-sudo apt install libxinerama-dev
-sudo apt install libxcursor-dev
-sudo apt install libxi-dev
+sudo apt install libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev
+```
+### Cmake on Ubuntu
+Cmake can be installed by both apt and snap on Ubuntu. Snap will install a newer version.
+```bash
+sudo snap install cmake --classic
 ```
 
 ## Runs on
 
 * OSX 13.2 (22D49) - Apple M2 Max
-* Ubuntu 20.04
+* Ubuntu 20.04 - Parallels VM
+* Ubuntu 20.04 - On metal
+* Ubuntu 22.04 - Parallels VM
 
 ### Web - untested
 
