@@ -916,10 +916,13 @@ void UpdateDrawFrameFourier(data *pData) {
   auto const Radius = 4.f / M_PI;
   auto Centre = es::Point(-5.f, 0.f, 0.f);
 
-  auto Ft = Centre + es::Vector(Radius * std::cosf(Omegat),
-                                Radius * std::sinf(Omegat), 0.f);
+  auto Ft = Centre + es::Vector(Radius * cosf(Omegat),
+                                Radius * sinf(Omegat), 0.f);
 
   ldaDrawCircle(pData->Hep, Centre, Radius);
+
+  // Draw the outer circle line
+  ldaDrawLine(pData->Hep, Centre, Ft);
 
   // ---
   // Create the Fourier series.
@@ -928,8 +931,8 @@ void UpdateDrawFrameFourier(data *pData) {
   for (int Idx = 1; Idx < pData->n; ++Idx) {
     auto nthTerm = 1.f + Idx * 2.f;
     auto Ftn =
-        Ftp + es::Vector(Radius / nthTerm * std::cosf(nthTerm * Omegat),
-                         Radius / nthTerm * std::sinf(nthTerm * Omegat), 0.f);
+        Ftp + es::Vector(Radius / nthTerm * cosf(nthTerm * Omegat),
+                         Radius / nthTerm * sinf(nthTerm * Omegat), 0.f);
     ldaDrawLine(pData->Hep, Ftp, Ftn);
     ldaDrawCircle(pData->Hep, Ftn, Radius / nthTerm);
     Ftp = Ftn;
@@ -953,6 +956,8 @@ void UpdateDrawFrameFourier(data *pData) {
     ldaDrawPoint(pData->Hep, E, {pData->Hep.m0, pData->Hep.m5, 0.f, 0.f});
   }
 
+  // Draw the inner circle line
+  ldaDrawLine(pData->Hep, Centre, Ftp);
   // Draw the connecting line
   ldaDrawLine(pData->Hep, Ftp, AnimationPoint);
 

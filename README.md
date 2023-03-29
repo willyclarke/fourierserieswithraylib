@@ -39,9 +39,17 @@ cmake --build build
 
 ## Dependencies
 
+* Gcc/G++
 * Raylib - gets pulled down with cmake's Fetchcontent.
 * On Linux some X-dev libraries are needed. CMake will complain and you need to install the missing libraries.
-* Gcc/G++
+** For Ubuntu 20.04 the following apt-packages are needed:
+
+```bash
+sudo apt install libxrandr-dev
+sudo apt install libxinerama-dev
+sudo apt install libxcursor-dev
+sudo apt install libxi-dev
+```
 
 ## Runs on
 
