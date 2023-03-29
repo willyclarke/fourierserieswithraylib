@@ -957,7 +957,7 @@ void UpdateDrawFrameFourier(data *pData) {
   }
 
   // Draw the inner circle line
-  ldaDrawLine(pData->Hep, Centre, Ftp);
+  ldaDrawLine(pData->Hep, Ft, Ftp);
   // Draw the connecting line
   ldaDrawLine(pData->Hep, Ftp, AnimationPoint);
 
