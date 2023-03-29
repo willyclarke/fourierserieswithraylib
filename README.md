@@ -1,5 +1,13 @@
 # Fourier plotting with raylib CMake Project
 
+## Licence
+
+Free and open source. The Licence is the same as used by Raylib, unmodified zlib/libpng,
+which is an OSI-certified, BSD-like license that allows static linking with closed source
+software. It is reproduced in its entirety in the license.txt file.
+
+## Description
+
 The code in here is motivated from an article written by Markus Buchholz, published on medium.
 
 His code can be found on [Github](https://github.com/markusbuchholz/Fourier-Series-in-Cpp-ImGui)
@@ -19,6 +27,7 @@ To compile the example, use one of the following dependending on your build targ
 Use the following to build for desktop:
 
 ``` bash
+rm -rf build
 cmake -B build
 cmake --build build
 ```
@@ -28,6 +37,30 @@ Or if Ninja build is preferred:
 cmake -B build -G Ninja
 cmake --build build
 ```
+
+## Dependencies
+
+* Gcc/G++
+* cmake
+* Raylib - gets pulled down with cmake's Fetchcontent.
+* On Linux some X-dev libraries are needed. CMake will complain and you need to install the missing libraries.
+
+** For Ubuntu 20.04 the following apt-packages are needed:
+```bash
+sudo apt install libxrandr-dev libxinerama-dev libxcursor-dev libxi-dev
+```
+### Cmake on Ubuntu
+Cmake can be installed by both apt and snap on Ubuntu. Snap will install a newer version.
+```bash
+sudo snap install cmake --classic
+```
+
+## Runs on
+
+* OSX 13.2 (22D49) - Apple M2 Max
+* Ubuntu 20.04 - Parallels VM
+* Ubuntu 20.04 - On metal
+* Ubuntu 22.04 - Parallels VM
 
 ### Web - untested
 
